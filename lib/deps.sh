@@ -22,6 +22,7 @@ DDAR_DEPS=(
 "curl|curl|optional|weather widget"
 "pavucontrol|pavucontrol|optional|full audio mixer from the audio popup"
 "btop|btop|optional|process viewer from the system popup"
+"inotifywait|inotify-tools|optional|theme 'dynamic' follows DankMaterialShell wallpaper changes live"
 )
 
 # Fonts are packages, not commands: fc-list check.

@@ -73,6 +73,11 @@ for name in waybar mako; do
     done
 done
 
+for pid in $(pgrep -x ddar-watch 2>/dev/null); do
+    kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null
+    ok "Stopped ddar-watch ($pid)"
+done
+
 # 2. Config file integration.
 remove_block "$XDG_CONFIG_HOME/hypr/hyprland.conf"
 remove_block "$XDG_CONFIG_HOME/kitty/kitty.conf"

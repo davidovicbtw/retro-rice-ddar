@@ -12,7 +12,7 @@ It is a set of small shell scripts, plus generated configs for Waybar, Rofi, Kit
 |---|---|---|---|
 | ![launcher](docs/screenshots/launcher.png) | ![menu](docs/screenshots/ddar-menu.png) | ![calendar](docs/screenshots/calendar-popup.png) | ![system](docs/screenshots/system-popup.png) |
 
-Bar in the three bundled themes (retro, dark-retro, mono-retro):
+Bar in three of the bundled themes (retro, dark-retro, mono-retro):
 
 ![bar themes](docs/screenshots/bar-themes.png)
 
@@ -169,6 +169,16 @@ ddar theme set dark-retro
 | `retro` | warm putty panels, deep teal accent (default) |
 | `dark-retro` | charcoal panels, amber CRT accent |
 | `mono-retro` | pure greyscale, high contrast |
+| `catppuccin` | Catppuccin Mocha: soft pastel dark, mauve accent |
+| `rose-pine` | Rosé Pine: muted dusk purples, rose accent |
+| `gruvbox` | Gruvbox dark: warm browns, orange accent |
+| `nord` | Nord: arctic blue-grey, frost accent |
+| `tokyo-night` | Tokyo Night: deep night blue, electric blue accent |
+| `dynamic` | every colour from the current wallpaper (Matugen, full palette) |
+
+The five palette themes (`catppuccin` … `tokyo-night`) use their official colours and ignore `MATUGEN`, so they always look like themselves. `ACCENT` still overrides them.
+
+`dynamic` always uses the full Matugen palette, whatever `MATUGEN` says. If DankMaterialShell is installed, it reads DMS's current wallpaper (`dms ipc call wallpaper get`, falling back to `~/.local/state/DankMaterialShell/session.json`). With `inotify-tools` installed, `ddar run` starts a small watcher (`ddar-watch`, event-driven, no polling) that recolours DDAR whenever DMS changes the wallpaper. Without Matugen, `dynamic` uses its built-in dark fallback colours.
 
 A theme is one small `theme.conf` file of `key=#rrggbb` lines. See [docs/themes.md](docs/themes.md) to make your own.
 

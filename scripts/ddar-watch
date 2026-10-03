@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# ddar-watch - keeps the "dynamic" theme in step with DankMaterialShell's
+# wallpaper. Started and stopped by `ddar run`; needs inotify-tools.
+# It blocks on inotify (no polling): when DMS rewrites its session file and
+# the wallpaper path changed, DDAR regenerates and reloads its colours.
+set -uo pipefail
+
+DDAR_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export DDAR_ROOT
+# shellcheck source=../lib/common.sh
+source "$DDAR_ROOT/lib/common.sh"
+# shellcheck source=../lib/generate.sh
+source "$DDAR_ROOT/lib/generate.sh"
+
+dir="$XDG_STATE_HOME/DankMaterialShell"
+have inotifywait || { err "ddar-watch needs inotifywait (sudo pacman -S inotify-tools)"; exit 1; }
+[[ -d "$dir" ]] || { err "No DankMaterialShell state directory at $dir"; exit 1; }
+
+last="$(sed -n 's/^wallpaper=//p' "$DDAR_GEN_DIR/palette.env" 2>/dev/null)"
+inotifywait -m -q -e close_write,moved_to --format '%f' "$dir" | while IFS= read -r file; do
+    [[ "$file" == session.json ]] || continue
+    # DMS may write the file several times in a row: settle first.
+    while IFS= read -r -t 1 _; do :; done
+    config_load
+    [[ "$(cfg THEME)" == dynamic ]] || continue
+    now="$(dms_wallpaper)" || continue
+    [[ "$now" == "$last" ]] && continue
+    last="$now"
+    "$DDAR_ROOT/bin/ddar" reload-colours >/dev/null 2>&1
+done

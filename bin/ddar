@@ -197,6 +197,7 @@ main() {
         doctor|check) ddar_doctor ;;
         uninstall) exec "$DDAR_ROOT/uninstall.sh" "$@" ;;
         generate) generate_all && ok "Generated" ;;
+        reload-colours) ddar_apply_theme_change ;;   # used by ddar-watch
         version|-v|--version) echo "ddar $DDAR_VERSION" ;;
         help|-h|--help) ddar_help ;;
         *) err "Unknown command: $cmd"; ddar_help; exit 1 ;;

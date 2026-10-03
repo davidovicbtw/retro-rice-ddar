@@ -1,0 +1,4 @@
+#!/bin/bash
+# Test double for matugen 4.x: replays real `matugen image --json hex` output.
+echo "matugen $*" >> "${FAKE_CMDS:-/dev/null}"
+cat "$(dirname "$(readlink -f "$0")")/matugen-output.json"

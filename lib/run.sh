@@ -78,6 +78,26 @@ ddar_kitty_reload() {
     return 0
 }
 
+# Start ddar-watch only while it is useful (theme "dynamic" + DMS installed),
+# otherwise make sure it is not running. One instance at most.
+ddar_watcher() {
+    local pids
+    pids="$(pgrep -x ddar-watch 2>/dev/null | tr '\n' ' ')"
+    if [[ "$(cfg THEME)" == dynamic ]] && have dms && [[ -d "$XDG_STATE_HOME/DankMaterialShell" ]]; then
+        [[ -n "$pids" ]] && return 0
+        if have inotifywait; then
+            spawn "$DDAR_SCRIPTS/ddar-watch" && ok "Following DankMaterialShell's wallpaper (theme: dynamic)"
+        else
+            warn "Theme 'dynamic' updates on 'ddar run' only; install inotify-tools to follow DMS wallpaper changes live"
+        fi
+    elif [[ -n "$pids" ]]; then
+        local p
+        # The watcher leads its own process group (setsid): stop inotifywait too.
+        for p in $pids; do kill -- "-$p" 2>/dev/null || kill "$p" 2>/dev/null; done
+    fi
+    return 0
+}
+
 # Reload everything that shows colours (used after theme/wallpaper changes).
 ddar_apply_theme_change() {
     generate_all
@@ -85,6 +105,7 @@ ddar_apply_theme_change() {
     ddar_waybar
     ddar_notifications
     ddar_kitty_reload
+    ddar_watcher
     in_hyprland && hyprctl reload >/dev/null && ok "Hyprland config reloaded"
     return 0
 }
@@ -117,6 +138,7 @@ ddar_run() {
     ddar_notifications
     wallpaper_apply
     ddar_kitty_reload
+    ddar_watcher
     if ((boot == 0)) && in_hyprland; then
         hyprctl reload >/dev/null && ok "Hyprland config reloaded"
     fi

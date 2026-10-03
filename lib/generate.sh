@@ -49,6 +49,8 @@ load_theme() {
     PAL[mode]="$(theme_meta "$file" MODE)"
     [[ "${PAL[mode]}" == dark ]] || PAL[mode]=light
     PAL[theme_name]="$(theme_meta "$file" NAME)"
+    PAL[dynamic]="$(theme_meta "$file" DYNAMIC)"   # yes: always full Matugen
+    PAL[fixed]="$(theme_meta "$file" FIXED)"       # yes: never Matugen (official palettes)
     for k in "${THEME_KEYS[@]}"; do [[ -n "${PAL[$k]:-}" ]] || missing+=("$k"); done
     if ((${#missing[@]})); then
         warn "Theme '$1' is missing: ${missing[*]} - using 'retro' values for those"
@@ -102,12 +104,41 @@ matugen_palette() {
     ' "$cache" 2>/dev/null
 }
 
+# The wallpaper DankMaterialShell is showing, if DMS is installed: first its
+# IPC, then its session file. Only an existing image file is accepted.
+dms_wallpaper() {
+    local p=""
+    have dms || return 1
+    p="$(timeout 2 dms ipc call wallpaper get 2>/dev/null | tail -n1)"
+    p="${p#"${p%%[![:space:]]*}"}"; p="${p%"${p##*[![:space:]]}"}"
+    if [[ ! -f "$p" ]] && have jq; then
+        p="$(jq -r '.wallpaperPath // empty' "$XDG_STATE_HOME/DankMaterialShell/session.json" 2>/dev/null)"
+    fi
+    [[ -f "$p" && -r "$p" ]] || return 1
+    printf '%s' "$p"
+}
+
+# Image the colours are derived from: DMS's wallpaper, else DDAR's own.
+colour_wallpaper() {
+    local img
+    img="$(dms_wallpaper)" && { printf '%s' "$img"; return 0; }
+    img="$(expand_path "$(cfg WALLPAPER)")"
+    if [[ -z "$img" && "${PAL[dynamic]:-}" == yes ]]; then img="$DDAR_ROOT/assets/wallpapers/ddar-teal.png"; fi
+    [[ -n "$img" && -r "$img" ]] && printf '%s' "$img"
+}
+
 apply_matugen() {
     local mode img line key val
-    mode="$(cfg MATUGEN)"; [[ "$mode" == off ]] && return 0
-    img="$(expand_path "$(cfg WALLPAPER)")"
-    [[ -n "$img" && -r "$img" ]] || return 0
-    if ! have matugen; then return 0; fi
+    if [[ "${PAL[dynamic]:-}" == yes ]]; then mode=full
+    elif [[ "${PAL[fixed]:-}" == yes ]]; then return 0
+    else mode="$(cfg MATUGEN)"; fi
+    [[ "$mode" == off ]] && return 0
+    img="$(colour_wallpaper)" || return 0
+    PAL[colour_img]="$img"
+    if ! have matugen; then
+        [[ "${PAL[dynamic]:-}" == yes ]] && warn "Theme 'dynamic' needs matugen (sudo pacman -S matugen) - using fallback colours"
+        return 0
+    fi
     local -A M=()
     while IFS='=' read -r key val; do [[ -n "$key" ]] && M[$key]="$val"; done < <(matugen_palette "$img" "${PAL[mode]}")
     if [[ -z "${M[accent]:-}" ]]; then warn "Matugen produced no palette, keeping theme colours"; return 0; fi
@@ -291,6 +322,7 @@ write_palette_env() {
         done
         echo "theme=$(cfg THEME)"
         echo "source=${PAL[palette_source]}"
+        echo "wallpaper=${PAL[colour_img]:-}"
     } >"$f"
 }
 

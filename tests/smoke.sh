@@ -54,6 +54,28 @@ for pair in "retro:spotlight" "dark-retro:spotlight-dark"; do
         diff -u "$2" "$h/.local/state/ddar/rofi/launcher.rasi"' "$DDAR" "${pair%%:*}" "$ROOT/extras/rofi/themes/${pair#*:}.rasi"
 done
 
+# --- themes and Matugen (fake matugen/dms from tests/fakes) ------------------
+FAKES="$ROOT/tests/fakes"
+DUSK="$ROOT/assets/wallpapers/ddar-dusk.png"
+t "palette themes keep their official accent" bash -c '
+    PATH="$3:$PATH"; "$0" config set THEME catppuccin && "$0" config set MATUGEN accent &&
+    "$0" config set WALLPAPER "$4" && "$0" generate && grep -qx "accent=#cba6f7" "$1/palette.env"' "$DDAR" "$G" "" "$FAKES" "$DUSK"
+t "retro (light) themes take the light Matugen accent" bash -c '
+    PATH="$2:$PATH"; "$0" config set THEME retro && "$0" generate && grep -qx "accent=#8e4954" "$1/palette.env" && grep -qx "source=matugen (accent)" "$1/palette.env"' "$DDAR" "$G" "$FAKES"
+t "dynamic uses the full Matugen palette" bash -c '
+    PATH="$2:$PATH"; "$0" config set THEME dynamic && "$0" config set MATUGEN off && "$0" generate &&
+    grep -qx "source=matugen (full)" "$1/palette.env" && grep -qx "face=#261d1e" "$1/palette.env"' "$DDAR" "$G" "$FAKES"
+t "dynamic follows the DMS wallpaper (IPC)" bash -c '
+    PATH="$2:$PATH" FAKE_DMS_WALLPAPER="$3" "$0" generate && grep -qx "wallpaper=$3" "$1/palette.env"' "$DDAR" "$G" "$FAKES" "$ROOT/assets/wallpapers/ddar-slate.png"
+mkdir -p "$SANDBOX/.local/state/DankMaterialShell"
+printf '{"wallpaperPath": "%s"}\n' "$ROOT/assets/wallpapers/ddar-teal.png" >"$SANDBOX/.local/state/DankMaterialShell/session.json"
+t "dynamic falls back to DMS session.json" bash -c '
+    PATH="$2:$PATH" FAKE_DMS_WALLPAPER="not a file" "$0" generate && grep -qx "wallpaper=$3" "$1/palette.env"' "$DDAR" "$G" "$FAKES" "$ROOT/assets/wallpapers/ddar-teal.png"
+t "dynamic without matugen keeps its fallback colours" bash -c '
+    PATH="$(printf "%s" "$PATH" | tr ":" "\n" | grep -v cargo | paste -sd:)"; command -v matugen && exit 1
+    "$0" generate 2>&1 | grep -q "needs matugen" && grep -qx "source=theme" "$1/palette.env"' "$DDAR" "$G"
+"$DDAR" config set THEME retro >/dev/null 2>&1; "$DDAR" config set WALLPAPER "" >/dev/null 2>&1; "$DDAR" config set MATUGEN accent >/dev/null 2>&1
+
 # --- configuration -----------------------------------------------------------
 t "config rejects out-of-range values" not "$DDAR" config set FONT_SIZE 99
 t "config rejects unknown modules" not "$DDAR" config set BAR_RIGHT "cpu nonsense"
