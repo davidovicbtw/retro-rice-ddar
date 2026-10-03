@@ -1,12 +1,17 @@
 /* DDAR Spotlight launcher for Rofi (>= 1.7).
- * One big search field in the upper third of the screen, results underneath.
+ * Spotlight layout (one big search field in the upper third, results
+ * underneath) drawn in the DDAR retro style: square window, 1px bevels,
+ * gradient title bar, sunken search field and result list.
  * Self-contained: colours are written in, nothing else is imported.
  *   rofi -show drun -theme /path/to/this/file.rasi
  * Source: templates/rofi/launcher-spotlight.rasi in the DDAR repository. */
 
 configuration {
     show-icons:          true;
-    drun-display-format: "{name}[  <span size='small' alpha='65%'>{generic}</span>]";
+    drun-display-format: "{name}[  <span size='small' alpha='70%'>{generic}</span>]";
+    display-drun:        "Find:";
+    display-run:         "Run:";
+    display-window:      "Window:";
     hover-select:        true;
     me-select-entry:     "";
     me-accept-entry:     "MousePrimary";
@@ -21,59 +26,84 @@ configuration {
     spacing:          0;
 }
 
+/* outer frame: dark 1px outline */
 window {
     location:         north;
     anchor:           north;
     y-offset:         18%;
-    width:            640px;
-    background-color: #f7f5eeff;
+    width:            600px;
+    background-color: #cdc8bbff;
     border:           1px;
-    border-color:     #8c877a;
-    border-radius:    14px;
-    padding:          10px;
+    border-color:     #2f2c27;
+    border-radius:    0;
+    padding:          0;
 }
 
+/* inner highlight edge = the raised bevel */
 mainbox {
-    spacing:          8px;
-    children:         [ inputbar, listview ];
+    border:           1px;
+    border-color:     #f4f1e8;
+    padding:          0 0 4px 0;
+    spacing:          6px;
+    children:         [ textbox-title, inputbar, listview, textbox-hint ];
 }
 
-inputbar {
-    spacing:          10px;
-    padding:          6px 8px;
-    children:         [ icon-search, entry ];
-}
-icon-search {
+/* literal colours: rofi gradients reject @variables */
+textbox-title {
     expand:           false;
-    filename:         "system-search";
-    size:             26px;
+    content:          "DDAR  Find Program";
+    background-image: linear-gradient(to right, #1d6a70, #6c9ea2);
+    text-color:       #ffffff;
+    padding:          3px 6px;
+    font:             "Noto Sans Bold 10";
+}
+
+/* search row: label + sunken field */
+inputbar {
+    margin:           2px 8px 0 8px;
+    spacing:          8px;
+    children:         [ prompt, entry ];
+}
+prompt {
     vertical-align:   0.5;
+    font:             "Noto Sans Bold 10";
 }
 entry {
-    font:             "Noto Sans 18";
-    placeholder:      "Search";
+    background-color: #f7f5ee;
+    text-color:       #1d1b17;
+    border:           1px;
+    border-color:     #8c877a;
+    padding:          5px 6px;
+    font:             "Noto Sans 15";
+    placeholder:      "type a program name...";
     placeholder-color: #5e5a50;
     vertical-align:   0.5;
     cursor:           text;
 }
 
-
 listview {
-    lines:            7;
+    margin:           0 8px;
+    lines:            8;
     columns:          1;
     fixed-height:     false;
     dynamic:          true;
-    scrollbar:        false;
-    spacing:          2px;
-    border:           1px 0 0 0;
+    scrollbar:        true;
+    background-color: #f7f5ee;
+    border:           1px;
     border-color:     #8c877a;
-    padding:          8px 0 0 0;
+    padding:          1px;
+}
+scrollbar {
+    width:            12px;
+    handle-width:     12px;
+    handle-color:     #8c877a;
+    background-color: #f4f1e8;
 }
 
 element {
-    padding:          7px 10px;
-    spacing:          12px;
-    border-radius:    9px;
+    padding:          4px 6px;
+    spacing:          8px;
+    text-color:       #1d1b17;
     cursor:           pointer;
 }
 element normal.active, element alternate.active {
@@ -84,7 +114,7 @@ element selected.normal, element selected.active {
     text-color:       #ffffff;
 }
 element-icon {
-    size:             28px;
+    size:             22px;
     cursor:           inherit;
 }
 element-text {
@@ -92,4 +122,12 @@ element-text {
     vertical-align:   0.5;
     markup:           true;
     cursor:           inherit;
+}
+
+textbox-hint {
+    expand:           false;
+    content:          "Enter: open     Esc: close";
+    margin:           0 8px;
+    text-color:       #5e5a50;
+    font:             "Noto Sans 9";
 }
