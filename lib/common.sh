@@ -90,7 +90,7 @@ DDAR_SCHEMA=(
 "TRANSPARENCY|int:0:60|0|Bar/launcher transparency (percent)"
 "ANIMATIONS|enum:off,low,normal|low|Hyprland animation intensity"
 "HYPR_STYLE|enum:on,off|on|Let DDAR set Hyprland borders/gaps/rounding/animations"
-"LAUNCHER_STYLE|enum:list,grid,compact|list|Rofi launcher layout"
+"LAUNCHER_STYLE|enum:list,grid,compact,spotlight|list|Rofi launcher layout"
 "LAUNCHER_ICONS|enum:on,off|on|Show application icons in the launcher"
 "TERMINAL|text|auto|Terminal used for TUI popups (auto = detect)"
 "NOTIFICATIONS|enum:auto,mako,off|auto|Start mako if no notification daemon is running"

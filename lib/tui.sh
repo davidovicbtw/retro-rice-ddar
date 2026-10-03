@@ -155,7 +155,7 @@ tui_launcher() {
     local k changed=0
     while true; do
         tui_screen "Configure Launcher" "$(_status)" \
-            "1|Layout: $(cfg LAUNCHER_STYLE)  (list / grid / compact)" "2|Icons: $(cfg LAUNCHER_ICONS)" \
+            "1|Layout: $(cfg LAUNCHER_STYLE)  (list / grid / compact / spotlight)" "2|Icons: $(cfg LAUNCHER_ICONS)" \
             "3|Preview launcher" "-" "q|Back (applies changes)"
         k="$(tui_key)"
         case "$k" in

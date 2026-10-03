@@ -1,0 +1,95 @@
+/* DDAR launcher - "spotlight": one big search field in the upper third of the
+ * screen, results underneath. Fully self-contained (colours are written in),
+ * so the generated file also works on its own:
+ *   rofi -show drun -theme ~/.local/state/ddar/rofi/launcher.rasi
+ * Generated, do not edit. */
+
+configuration {
+    show-icons:          @@show_icons@@;
+    drun-display-format: "{name}[  <span size='small' alpha='65%'>{generic}</span>]";
+    hover-select:        true;
+    me-select-entry:     "";
+    me-accept-entry:     "MousePrimary";
+    sort:                true;
+    sorting-method:      "fzf";
+}
+
+* {
+    font:             "@@font@@ @@font_size@@";
+    background-color: transparent;
+    text-color:       @@field_text@@;
+    spacing:          0;
+}
+
+window {
+    location:         north;
+    anchor:           north;
+    y-offset:         18%;
+    width:            640px;
+    background-color: @@field@@@@alpha_hex@@;
+    border:           1px;
+    border-color:     @@face_lo@@;
+    border-radius:    14px;
+    padding:          10px;
+}
+
+mainbox {
+    spacing:          8px;
+    children:         [ inputbar, listview ];
+}
+
+inputbar {
+    spacing:          10px;
+    padding:          6px 8px;
+    children:         [ icon-search, entry ];
+}
+icon-search {
+    expand:           false;
+    filename:         "system-search";
+    size:             26px;
+    vertical-align:   0.5;
+}
+entry {
+    font:             "@@font@@ 18";
+    placeholder:      "Search";
+    placeholder-color: @@text_dim@@;
+    vertical-align:   0.5;
+    cursor:           text;
+}
+
+
+listview {
+    lines:            7;
+    columns:          1;
+    fixed-height:     false;
+    dynamic:          true;
+    scrollbar:        false;
+    spacing:          2px;
+    border:           1px 0 0 0;
+    border-color:     @@face_lo@@;
+    padding:          8px 0 0 0;
+}
+
+element {
+    padding:          7px 10px;
+    spacing:          12px;
+    border-radius:    9px;
+    cursor:           pointer;
+}
+element normal.active, element alternate.active {
+    text-color:       @@accent@@;
+}
+element selected.normal, element selected.active {
+    background-color: @@accent@@;
+    text-color:       @@accent_text@@;
+}
+element-icon {
+    size:             28px;
+    cursor:           inherit;
+}
+element-text {
+    text-color:       inherit;
+    vertical-align:   0.5;
+    markup:           true;
+    cursor:           inherit;
+}
