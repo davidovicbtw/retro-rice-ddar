@@ -1,0 +1,4 @@
+/* Rofi config: Spotlight-style launcher (from DDAR).
+ * Copy this folder's contents into ~/.config/rofi/ and run: rofi -show drun
+ * Light version: change the line below to  @theme "spotlight"            */
+@theme "spotlight-dark"

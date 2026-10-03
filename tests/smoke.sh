@@ -48,10 +48,10 @@ fi
 
 # The standalone copies in extras/ must match what the generator produces.
 for pair in "retro:spotlight" "dark-retro:spotlight-dark"; do
-    t "extras/rofi/${pair#*:}.rasi is up to date" bash -c '
+    t "extras/rofi/themes/${pair#*:}.rasi is up to date" bash -c '
         h="$(mktemp -d)"; export HOME="$h"
         "$0" config set THEME "$1" && "$0" config set MATUGEN off && "$0" config set LAUNCHER_STYLE spotlight && "$0" generate &&
-        diff -u "$2" "$h/.local/state/ddar/rofi/launcher.rasi"' "$DDAR" "${pair%%:*}" "$ROOT/extras/rofi/${pair#*:}.rasi"
+        diff -u "$2" "$h/.local/state/ddar/rofi/launcher.rasi"' "$DDAR" "${pair%%:*}" "$ROOT/extras/rofi/themes/${pair#*:}.rasi"
 done
 
 # --- configuration -----------------------------------------------------------
