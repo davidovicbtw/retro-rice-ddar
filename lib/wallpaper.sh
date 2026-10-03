@@ -20,9 +20,19 @@ wallpaper_current() {
     else printf '%s' "$DDAR_ROOT/assets/wallpapers/ddar-teal.png"; fi
 }
 
+# Prints the name of a running desktop shell that manages its own wallpaper.
+desktop_shell_running() {
+    local p
+    for p in dms quickshell qs; do pgrep -x "$p" >/dev/null 2>&1 && { echo "$p"; return 0; }; done
+    return 1
+}
+
 wallpaper_backend() {
     local b; b="$(cfg WALLPAPER_BACKEND)"
     if [[ "$b" == auto ]]; then
+        # A desktop shell (DankMaterialShell and other Quickshell shells) draws
+        # its own wallpaper; a second wallpaper program would cover it.
+        desktop_shell_running >/dev/null && { echo none; return; }
         for b in awww swww swaybg hyprpaper; do have "$b" && { echo "$b"; return; }; done
         echo none; return
     fi
@@ -74,6 +84,9 @@ wallpaper_set() {
     config_set WALLPAPER "$f"
     wallpaper_apply "$f"
     ok "Wallpaper: $f"
+    if [[ "$(wallpaper_backend)" == none ]]; then
+        msg "${C_DIM}DDAR does not draw wallpapers here (WALLPAPER_BACKEND=$(cfg WALLPAPER_BACKEND)$(desktop_shell_running >/dev/null && echo ', desktop shell detected')); the image is only used for colours.${C_RESET}"
+    fi
     if [[ "$(cfg MATUGEN)" != off ]]; then
         if have matugen; then
             info "Regenerating colours from the wallpaper (MATUGEN=$(cfg MATUGEN))"

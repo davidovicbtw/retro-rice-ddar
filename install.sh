@@ -154,6 +154,22 @@ if [[ -d "$wpdir" ]]; then ok "Wallpaper folder: $wpdir"
 else msg "${C_DIM}Wallpaper folder $wpdir does not exist; DDAR will use its bundled wallpapers until you create it.${C_RESET}"; fi
 
 # ------------------------------------------------------------------------
+step "Desktop shell detection"
+shell_pids=""
+for p in dms quickshell qs; do pgrep -x "$p" >/dev/null 2>&1 && shell_pids+="$p "; done
+if [[ -z "$shell_pids" && -r "$HYPR_CONF" ]] && grep -qE '^[[:space:]]*exec(-once)?[[:space:]]*=.*\b(dms|quickshell|qs)\b' "$HYPR_CONF"; then
+    shell_pids="(started from hyprland.conf)"
+fi
+if [[ -n "$shell_pids" ]]; then
+    warn "A desktop shell is in use: $shell_pids (e.g. DankMaterialShell)."
+    msg "  It draws its own wallpaper, so DDAR will NOT start a wallpaper program."
+    [[ "$(cfg WALLPAPER_BACKEND)" == auto ]] && config_set WALLPAPER_BACKEND none && ok "WALLPAPER_BACKEND=none"
+    msg "  It probably has its own bar too; DDAR's Waybar would be a second bar."
+else
+    ok "No Quickshell-based desktop shell detected"
+fi
+
+# ------------------------------------------------------------------------
 step "Hyprland startup inspection"
 AUTOSTART_WANTED="$(cfg AUTOSTART)"
 if [[ -r "$HYPR_CONF" ]]; then
