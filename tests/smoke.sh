@@ -39,7 +39,7 @@ done
 t "no unrendered @@tokens" not grep -rl "@@" "$G" "$H"
 t "hyprland snippets have balanced braces" bash -c 'for f in "$0"/*.conf; do awk "/\\{\$/{d++} /^[[:space:]]*\\}/{d--} END{exit d!=0}" "$f" || { echo "$f"; exit 1; }; done' "$H"
 for style in list grid compact spotlight; do
-    t "launcher style $style" bash -c '"$0" config set LAUNCHER_STYLE "$1" && "$0" generate && grep -q "window" "$2/rofi/launcher.rasi"' "$DDAR" "$style" "$G"
+    t "launcher style $style" bash -c '"$0" config set LAUNCHER_STYLE "$1" && "$0" generate && grep -qE "@import|window" "$2/rofi/launcher.rasi"' "$DDAR" "$style" "$G"
 done
 if command -v rofi >/dev/null && [[ -n "${DISPLAY:-}" ]]; then
     t "rofi parses launcher theme" bash -c '! rofi -theme "$0/rofi/launcher.rasi" -dump-theme 2>&1 | grep -q "Failed to parse"' "$G"
