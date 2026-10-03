@@ -1,0 +1,186 @@
+/* DDAR Waybar style. Generated from templates/waybar/style.css - do not edit.
+ * Visual language: flat putty panel, 1px bevels (light top-left, dark
+ * bottom-right), sunken status well on the right, no blur, no rounding. */
+@import url("colors.css");
+
+* {
+    font-family: "@@font@@", "DejaVu Sans", sans-serif;
+    font-size: @@font_size@@pt;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+window#waybar {
+    background-color: alpha(@face, @@opacity@@);
+    color: @text;
+    border-bottom: 1px solid @frame;
+    box-shadow: inset 0 -1px @face_lo, inset 0 1px @face_hi;
+}
+
+tooltip {
+    background-color: @tip;
+    border: 1px solid @frame;
+}
+tooltip label {
+    color: @tip_text;
+    padding: 1px 3px;
+}
+
+/* ------------------------------------------------ raised button look -- */
+#custom-ddar,
+#workspaces button,
+#taskbar button {
+    background-color: @face;
+    color: @text;
+    border: 1px solid;
+    border-color: @face_hi @frame @frame @face_hi;
+    box-shadow: inset -1px -1px @face_lo;
+    margin: 2px 1px;
+    padding: 0 6px;
+}
+
+#custom-ddar:hover,
+#workspaces button:hover,
+#taskbar button:hover {
+    background-color: @face_hover;
+}
+
+/* pressed / active = sunken */
+#workspaces button.active,
+#taskbar button.active {
+    background-color: @face_pressed;
+    border-color: @frame @face_hi @face_hi @frame;
+    box-shadow: inset 1px 1px @face_lo;
+    font-weight: bold;
+}
+
+/* ------------------------------------------------------- DDAR button -- */
+#custom-ddar {
+    background-image: linear-gradient(to bottom, @title_b, @title_a);
+    color: @accent_text;
+    font-weight: bold;
+    margin-left: 2px;
+    margin-right: 4px;
+    padding: 0 8px;
+}
+#custom-ddar:hover {
+    background-image: linear-gradient(to bottom, @title_a, @title_a);
+}
+
+/* -------------------------------------------------------- workspaces -- */
+#workspaces {
+    margin-right: 4px;
+}
+#workspaces button {
+    min-width: 14px;
+    padding: 0 4px;
+}
+#workspaces button.active {
+    background-color: @accent;
+    color: @accent_text;
+}
+#workspaces button.urgent {
+    background-color: @urgent;
+    color: @accent_text;
+}
+#workspaces button.empty {
+    color: @text_dim;
+}
+
+/* ----------------------------------------------------------- taskbar -- */
+#taskbar button {
+    padding: 0 8px 0 4px;
+    min-width: 90px;
+}
+#taskbar button.minimized {
+    color: @text_dim;
+}
+#taskbar button.urgent {
+    color: @urgent;
+}
+
+#window {
+    color: @text;
+    padding: 0 8px;
+}
+window#waybar.empty #window {
+    background: transparent;
+}
+
+/* ------------------------------------------- status well (right side) -- */
+.modules-right {
+    background-color: alpha(@face, @@opacity@@);
+    border: 1px solid;
+    border-color: @face_lo @face_hi @face_hi @face_lo;
+    margin: 2px 2px 3px 0;
+    padding: 0 2px;
+}
+
+#mpris,
+#cpu,
+#memory,
+#network,
+#pulseaudio,
+#battery,
+#backlight,
+#tray,
+#clock,
+#custom-weather {
+    color: @text;
+    padding: 0 7px;
+    /* etched separator */
+    border-left: 1px solid @face_lo;
+    box-shadow: inset 1px 0 @face_hi;
+}
+
+#mpris:hover,
+#cpu:hover,
+#memory:hover,
+#network:hover,
+#pulseaudio:hover,
+#battery:hover,
+#clock:hover,
+#custom-weather:hover {
+    background-color: @face_hover;
+}
+
+#mpris.paused {
+    color: @text_dim;
+}
+
+#cpu.warning, #memory.warning, #battery.warning:not(.charging) {
+    color: @warn;
+}
+#cpu.critical, #memory.critical, #battery.critical:not(.charging) {
+    color: @urgent;
+    font-weight: bold;
+}
+#battery.charging, #battery.plugged {
+    color: @good;
+}
+#network.disconnected, #pulseaudio.muted {
+    color: @text_dim;
+}
+
+#clock {
+    font-weight: bold;
+}
+
+/* the tray has no text of its own: no separator, so an empty tray is invisible */
+#tray {
+    border-left: none;
+    box-shadow: none;
+    padding: 0 2px;
+}
+
+#tray menu {
+    background-color: @face;
+    color: @text;
+    border: 1px solid @frame;
+}
+#tray > .needs-attention {
+    background-color: @urgent;
+}

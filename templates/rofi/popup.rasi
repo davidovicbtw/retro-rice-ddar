@@ -1,0 +1,30 @@
+/* DDAR bar popups (network, audio, power, ...). Position and title are set
+ * per popup with -theme-str by scripts/ddar-popup. Generated, do not edit. */
+@import "base.rasi"
+
+window {
+    location:         north east;
+    anchor:           north east;
+    x-offset:         -2px;
+    width:            320px;
+}
+configuration {
+    show-icons:       false;
+}
+listview {
+    lines:            10;
+    scrollbar:        false;
+}
+mainbox {
+    /* no search box: popups are short; the Wi-Fi list adds one back */
+    children:         [ textbox-title, message, listview, textbox-hint ];
+}
+inputbar {
+    children:         [ entry ];
+}
+entry {
+    placeholder:      "filter...";
+}
+textbox-hint {
+    content:          "Enter: select   Esc: close";
+}

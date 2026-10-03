@@ -1,0 +1,334 @@
+#!/usr/bin/env bash
+# ddar-popup - small Rofi-based popups opened from the DDAR bar.
+#   ddar-popup <menu|launcher|network|audio|power|system|media|calendar>
+#   ddar-popup --dmenu TITLE [MESSAGE]     generic picker (stdin -> stdout)
+# Clicking a module while its popup is open closes it (toggle).
+set -uo pipefail
+
+DDAR_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export DDAR_ROOT
+# shellcheck source=../lib/common.sh
+source "$DDAR_ROOT/lib/common.sh"
+# shellcheck source=../lib/generate.sh
+source "$DDAR_ROOT/lib/generate.sh"
+config_load
+
+DDAR="$DDAR_ROOT/bin/ddar"
+THEME="$DDAR_GEN_DIR/rofi/popup.rasi"
+ANCHOR="north east"
+
+have rofi || { notify "rofi is not installed"; exit 1; }
+[[ -r "$THEME" ]] || "$DDAR" generate >/dev/null
+
+# Palette for inline markup (today in the calendar, etc.).
+ACC="#1d6a70"; ACC_FG="#ffffff"; DIM="#5e5a50"
+if [[ -r "$DDAR_GEN_DIR/palette.env" ]]; then
+    ACC="$(sed -n 's/^accent=//p' "$DDAR_GEN_DIR/palette.env")"
+    ACC_FG="$(sed -n 's/^accent_text=//p' "$DDAR_GEN_DIR/palette.env")"
+    DIM="$(sed -n 's/^text_dim=//p' "$DDAR_GEN_DIR/palette.env")"
+fi
+
+# Escape text for Pango markup.
+esc() { local s="$1"; s="${s//&/&amp;}"; s="${s//</&lt;}"; s="${s//>/&gt;}"; printf '%s' "$s"; }
+
+# menu TITLE MESSAGE ROW... -> prints selected row index (0-based), or fails on Esc.
+# EXTRA_THEME may add theme overrides for one popup.
+EXTRA_THEME=""
+menu() {
+    local title="$1" mesg="$2"; shift 2
+    local ts="window { location: $ANCHOR; anchor: $ANCHOR; } textbox-title { content: \"${title//\"/}\"; } $EXTRA_THEME"
+    local -a args=(-dmenu -i -no-custom -format i -theme "$THEME" -theme-str "$ts" -p "")
+    [[ -n "$mesg" ]] && args+=(-mesg "$mesg")
+    printf '%s\n' "$@" | rofi "${args[@]}"
+}
+
+confirm_menu() { # confirm_menu QUESTION -> success if "Yes"
+    local r; r="$(menu "Confirm" "$(esc "$1")" "Yes" "No")" || return 1
+    [[ "$r" == 0 ]]
+}
+
+kv() { printf '<b>%-9s</b> %s\n' "$1" "$(esc "$2")"; }
+
+# ------------------------------------------------------------- network --
+_nm_result() { # run an nmcli command and report the outcome
+    if "$@" >/dev/null 2>&1; then notify "Connected to $i"; else notify "Could not connect to $i"; fi
+}
+
+popup_network() {
+    local radio dev state conn ssid_list=() rows=() r i line inuse signal sec ssid mesg known pw
+    if ! have nmcli; then
+        menu "Network" "nmcli (NetworkManager) is not installed." "Close" >/dev/null; return
+    fi
+    while true; do
+        radio="$(nmcli radio wifi 2>/dev/null)"
+        read -r dev state conn < <(nmcli -t -f DEVICE,STATE,CONNECTION device 2>/dev/null |
+            awk -F: '$2 == "connected" { print $1, $2, $3; exit }')
+        mesg="$(kv Status "${state:-disconnected}")"
+        [[ -n "${conn:-}" ]] && mesg+=$'\n'"$(kv Network "$conn")"$'\n'"$(kv Device "$dev")"
+        [[ -n "${dev:-}" ]] && mesg+=$'\n'"$(kv Address "$(nmcli -g IP4.ADDRESS device show "$dev" 2>/dev/null | head -n1)")"
+
+        rows=("Wi-Fi: ${radio:-n/a}  (toggle)" "Rescan networks")
+        ssid_list=("" "")
+        if [[ "$radio" == enabled ]]; then
+            while IFS= read -r line; do
+                IFS=: read -r inuse signal sec ssid <<<"$line"
+                ssid="${ssid//\\:/:}"; ssid="${ssid//\\\\/\\}"
+                [[ -n "$ssid" ]] || continue
+                rows+=("$(printf '%s %-20.20s %3s%%  %s' "$([[ "$inuse" == '*' ]] && echo '●' || echo ' ')" "$ssid" "$signal" "${sec:-open}")")
+                ssid_list+=("$ssid")
+            done < <(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID device wifi list --rescan no 2>/dev/null | sort -t: -k2 -rn | awk -F: '!seen[$NF]++')
+        fi
+        [[ -n "${conn:-}" ]] && { rows+=("Disconnect $conn"); ssid_list+=("@disconnect"); }
+        rows+=("Network settings...")
+        ssid_list+=("@settings")
+
+        EXTRA_THEME="mainbox { children: [ textbox-title, message, inputbar, listview, textbox-hint ]; }"
+        r="$(menu "Network" "$mesg" "${rows[@]}")" || return
+        EXTRA_THEME=""
+        case "$r" in
+            0) if [[ "$radio" == enabled ]]; then nmcli radio wifi off; else nmcli radio wifi on; fi ;;
+            1) notify "Scanning for networks..."; nmcli device wifi rescan 2>/dev/null; sleep 2 ;;
+            *)
+                i="${ssid_list[r]}"
+                case "$i" in
+                    @disconnect) nmcli device disconnect "$dev" >/dev/null && notify "Disconnected" ;;
+                    @settings)
+                        if have nm-connection-editor; then spawn nm-connection-editor
+                        elif have nmtui; then run_in_terminal nmtui
+                        else notify "Install nm-connection-editor or use nmtui"; fi
+                        return ;;
+                    *)
+                        known="$(nmcli -g NAME connection show 2>/dev/null | grep -Fx -- "$i")"
+                        if [[ -n "$known" ]]; then
+                            _nm_result nmcli connection up id "$i"
+                        else
+                            pw=""
+                            if [[ "${rows[r]}" != *open ]]; then
+                                pw="$(rofi -dmenu -password -theme "$THEME" -theme-str "window { location: $ANCHOR; anchor: $ANCHOR; } textbox-title { content: \"Password\"; } listview { enabled: false; }" -p "" -mesg "Password for $(esc "$i")" </dev/null)" || continue
+                            fi
+                            # Note: nmcli receives the password as an argument (standard nmcli usage).
+                            if [[ -n "$pw" ]]; then
+                                _nm_result nmcli device wifi connect "$i" password "$pw"
+                            else
+                                _nm_result nmcli device wifi connect "$i"
+                            fi
+                        fi
+                        return ;;
+                esac ;;
+        esac
+    done
+}
+
+# --------------------------------------------------------------- audio --
+_vol_get() {
+    if have pactl; then
+        VOL="$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]*%' | head -n1 | tr -d %)"
+        [[ "$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null)" == *yes* ]] && MUTED=1 || MUTED=0
+    elif have wpctl; then
+        local out; out="$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)"
+        VOL="$(awk '{ printf "%d", $2 * 100 }' <<<"$out")"
+        [[ "$out" == *MUTED* ]] && MUTED=1 || MUTED=0
+    else
+        VOL=""; MUTED=0
+    fi
+}
+_vol_set()  { if have pactl; then pactl set-sink-volume @DEFAULT_SINK@ "$1"; else wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ "${1/#+/}"; fi; }
+_vol_step() { if have pactl; then pactl set-sink-volume @DEFAULT_SINK@ "$1"; else wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ "${1#[+-]}${1:0:1}"; fi; }
+_mute()     { if have pactl; then pactl set-sink-mute @DEFAULT_SINK@ toggle; else wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; fi; }
+_mic_mute() { if have pactl; then pactl set-source-mute @DEFAULT_SOURCE@ toggle; else wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle; fi; }
+
+popup_audio() {
+    local rows r bar n def mesg
+    local -a sinks=() descs=()
+    if ! have pactl && ! have wpctl; then
+        menu "Audio" "Neither pactl (libpulse) nor wpctl (wireplumber) is installed." "Close" >/dev/null; return
+    fi
+    while true; do
+        _vol_get
+        n=$(( ${VOL:-0} / 10 )); ((n > 10)) && n=10
+        printf -v bar '%*s' "$n" ""; bar="${bar// /█}"; printf -v bar '%-10s' "$bar"; bar="${bar// /░}"
+        mesg="$(kv Volume "${VOL:-?}%$([[ $MUTED == 1 ]] && echo ' (muted)')")"$'\n'"<tt>[$bar]</tt>"
+        sinks=(); descs=()
+        if have pactl; then
+            def="$(pactl get-default-sink 2>/dev/null)"
+            while IFS=$'\t' read -r name desc; do sinks+=("$name"); descs+=("$desc"); done < <(
+                pactl list sinks 2>/dev/null | awk -F': ' '/^\tName: /{n=$2} /^\tDescription: /{print n "\t" $2}')
+            mesg+=$'\n'"$(kv Output "$(for i in "${!sinks[@]}"; do [[ "${sinks[i]}" == "$def" ]] && echo "${descs[i]}"; done)")"
+        fi
+        rows=("$([[ $MUTED == 1 ]] && echo 'Unmute' || echo 'Mute')" "Volume +5%" "Volume -5%" \
+              "Volume 100%" "Volume 75%" "Volume 50%" "Volume 25%" "Toggle microphone mute")
+        local base=${#rows[@]} i
+        for i in "${!sinks[@]}"; do rows+=("$([[ "${sinks[i]}" == "$def" ]] && echo '●' || echo ' ') ${descs[i]}"); done
+        have pavucontrol && rows+=("Open mixer...")
+        r="$(menu "Audio" "$mesg" "${rows[@]}")" || return
+        case "$r" in
+            0) _mute ;; 1) _vol_step +5% ;; 2) _vol_step -5% ;;
+            3) _vol_set 100% ;; 4) _vol_set 75% ;; 5) _vol_set 50% ;; 6) _vol_set 25% ;;
+            7) _mic_mute ;;
+            *)
+                if (( r - base < ${#sinks[@]} )); then pactl set-default-sink "${sinks[r - base]}"
+                else spawn pavucontrol; return; fi ;;
+        esac
+    done
+}
+
+# --------------------------------------------------------------- power --
+popup_power() {
+    local bat cap status mesg rows=() actions=() r prof p
+    bat="$(compgen -G '/sys/class/power_supply/BAT*' | head -n1)"
+    if [[ -n "$bat" ]]; then
+        cap="$(<"$bat/capacity")"; status="$(<"$bat/status")"
+        mesg="$(kv Battery "$cap% ($status)")"
+        if have upower; then
+            local t; t="$(upower -i "$(upower -e | grep -m1 BAT)" 2>/dev/null | sed -n 's/^ *time to \(empty\|full\): *//p' | head -n1)"
+            [[ -n "$t" ]] && mesg+=$'\n'"$(kv Time "$t")"
+        fi
+    else
+        mesg="$(kv Power "AC (no battery)")"
+    fi
+    if have powerprofilesctl; then
+        prof="$(powerprofilesctl get 2>/dev/null)"
+        mesg+=$'\n'"$(kv Profile "$prof")"
+        for p in $(powerprofilesctl list 2>/dev/null | sed -n 's/^[* ] *\([a-z-]*\):$/\1/p'); do
+            rows+=("$([[ "$p" == "$prof" ]] && echo '●' || echo ' ') Profile: $p"); actions+=("profile:$p")
+        done
+    fi
+    rows+=("Lock screen" "Suspend" "Log out" "Reboot" "Shut down")
+    actions+=(lock suspend logout reboot poweroff)
+    r="$(menu "Power" "$mesg" "${rows[@]}")" || return
+    case "${actions[r]}" in
+        profile:*) powerprofilesctl set "${actions[r]#profile:}" ;;
+        lock) if have hyprlock; then spawn hyprlock; else loginctl lock-session; fi ;;
+        suspend) systemctl suspend ;;
+        logout) confirm_menu "Log out of Hyprland?" && hyprctl dispatch exit ;;
+        reboot) confirm_menu "Reboot now?" && systemctl reboot ;;
+        poweroff) confirm_menu "Shut down now?" && systemctl poweroff ;;
+    esac
+}
+
+# -------------------------------------------------------------- system --
+popup_system() {
+    local mesg r load mem swap disk procs viewer=""
+    for viewer in btop htop top; do have "$viewer" && break; done
+    while true; do
+        read -r load _ < /proc/loadavg
+        mem="$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf "%.1f / %.1f GiB (%d%%)", (t-a)/1048576, t/1048576, (t-a)*100/t}' /proc/meminfo)"
+        swap="$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{ if (t > 0) printf "%.1f / %.1f GiB", (t-f)/1048576, t/1048576; else print "none" }' /proc/meminfo)"
+        disk="$(df -h --output=used,size,pcent / 2>/dev/null | awk 'NR==2 {print $1 " / " $2 " (" $3 ")"}')"
+        procs="$(ps -eo comm,%cpu,%mem --sort=-%cpu 2>/dev/null | awk 'NR>1 && NR<=6 { printf "%-15.15s %5s%% %5s%%\n", $1, $2, $3 }')"
+        mesg="$(kv CPU "$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo | head -n1 |
+            sed -E 's/\((R|TM)\)//g; s/ (CPU|Processor)//g; s/ @.*//; s/ +/ /g' | cut -c1-26)")"
+        mesg+=$'\n'"$(kv Load "$load ($(nproc) threads)")"$'\n'"$(kv Memory "$mem")"$'\n'"$(kv Swap "$swap")"
+        mesg+=$'\n'"$(kv Disk "$disk")"$'\n'"$(kv Uptime "$(uptime -p | sed 's/^up //')")"
+        mesg+=$'\n\n'"<b>Top processes      CPU    MEM</b>"$'\n'"$(esc "$procs")"
+        r="$(menu "System" "<tt>$mesg</tt>" "Refresh" "Process viewer ($viewer)" "DDAR doctor")" || return
+        case "$r" in
+            0) continue ;;
+            1) run_in_terminal "$viewer"; return ;;
+            2) run_in_terminal bash -c "'$DDAR' doctor; echo; read -rsn1 -p 'Press any key to close'"; return ;;
+        esac
+    done
+}
+
+# --------------------------------------------------------------- media --
+popup_media() {
+    local players=() p cur status meta album mesg rows r state="${XDG_RUNTIME_DIR:-/tmp}/ddar-player"
+    if ! have playerctl; then menu "Media" "playerctl is not installed." "Close" >/dev/null; return; fi
+    while true; do
+        mapfile -t players < <(playerctl -l 2>/dev/null)
+        if ((${#players[@]} == 0)); then menu "Media" "No media player is running." "Close" >/dev/null; return; fi
+        cur="$(cat "$state" 2>/dev/null)"
+        printf '%s\n' "${players[@]}" | grep -qxF -- "$cur" || cur="${players[0]}"
+        status="$(playerctl -p "$cur" status 2>/dev/null)"
+        meta="$(playerctl -p "$cur" metadata --format '{{artist}} - {{title}}' 2>/dev/null)"
+        album="$(playerctl -p "$cur" metadata album 2>/dev/null)"
+        mesg="$(kv Player "$cur")"$'\n'"$(kv Status "${status:-?}")"$'\n'"$(kv Track "${meta:-?}")"
+        [[ -n "$album" ]] && mesg+=$'\n'"$(kv Album "$album")"
+        rows=("$([[ "$status" == Playing ]] && echo 'Pause' || echo 'Play')" "Next track" "Previous track" "Stop")
+        for p in "${players[@]}"; do rows+=("$([[ "$p" == "$cur" ]] && echo '●' || echo ' ') Use $p"); done
+        r="$(menu "Media" "$mesg" "${rows[@]}")" || return
+        case "$r" in
+            0) playerctl -p "$cur" play-pause ;; 1) playerctl -p "$cur" next ;;
+            2) playerctl -p "$cur" previous ;; 3) playerctl -p "$cur" stop ;;
+            *) printf '%s' "${players[r - 4]}" >"$state" ;;
+        esac
+        sleep 0.3
+    done
+}
+
+# ------------------------------------------------------------ calendar --
+popup_calendar() {
+    local off=0 m y cal mesg r today_d today_m today_y
+    have cal || { menu "Calendar" "$(esc "$(date '+%A, %d %B %Y  %H:%M')")" "Close" >/dev/null; return; }
+    read -r today_d today_m today_y < <(date '+%-d %-m %Y')
+    while true; do
+        read -r m y < <(date -d "$today_y-$today_m-15 $off month" '+%-m %Y')
+        cal="$(cal "$m" "$y" 2>/dev/null | sed 's/[[:space:]]*$//')"
+        cal="$(esc "$cal")"
+        if [[ "$m" == "$today_m" && "$y" == "$today_y" ]]; then
+            cal="$(sed -E "3,\$ s/(^| )(${today_d})( |\$)/\\1<span background='${ACC}' foreground='${ACC_FG}'><b>\\2<\\/b><\\/span>\\3/" <<<"$cal")"
+        fi
+        mesg="<b>$(esc "$(date '+%A, %d %B %Y')")</b>  <span foreground='${DIM}'>$(date '+%H:%M')</span>"$'\n\n'"<tt>$cal</tt>"
+        r="$(menu "Calendar" "$mesg" "< Previous month" "Today" "Next month >")" || return
+        case "$r" in 0) off=$((off - 1)) ;; 1) off=0 ;; 2) off=$((off + 1)) ;; esac
+    done
+}
+
+# ---------------------------------------------------------- DDAR menu --
+popup_menu() {
+    local r t rows themes=()
+    ANCHOR="north west"
+    rows=("Programs..." "Run command..." "Windows..." "Themes ▸" "Wallpaper ▸"
+          "Keyboard shortcuts" "Settings (TUI)..." "System ▸" "Reload DDAR" "Power ▸")
+    r="$(menu "DDAR" "" "${rows[@]}")" || return
+    case "$r" in
+        0) exec "$DDAR" launcher ;;
+        1) exec rofi -show run -theme "$DDAR_GEN_DIR/rofi/launcher.rasi" ;;
+        2) exec rofi -show window -theme "$DDAR_GEN_DIR/rofi/launcher.rasi" ;;
+        3)
+            mapfile -t themes < <(theme_names)
+            local labels=() n
+            for n in "${themes[@]}"; do labels+=("$([[ "$n" == "$(cfg THEME)" ]] && echo '●' || echo ' ') $n"); done
+            t="$(menu "Themes" "" "${labels[@]}")" || return
+            "$DDAR" theme set "${themes[t]}" >/dev/null && notify "Theme: ${themes[t]}" ;;
+        4)
+            t="$(menu "Wallpaper" "" "Next" "Previous" "Random" "Choose...")" || return
+            case "$t" in
+                0) "$DDAR" wallpaper next >/dev/null ;; 1) "$DDAR" wallpaper prev >/dev/null ;;
+                2) "$DDAR" wallpaper random >/dev/null ;; 3) "$DDAR" wallpaper </dev/null >/dev/null ;;
+            esac ;;
+        5)
+            local list; list="$("$DDAR" shortcut list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | head -n -1)"
+            t="$(menu "Shortcuts" "<tt>$(esc "$list")</tt>" "Edit shortcuts (TUI)..." "Close")" || return
+            [[ "$t" == 0 ]] && run_in_terminal "$DDAR" shortcut edit ;;
+        6) run_in_terminal "$DDAR" ;;
+        7) popup_system ;;
+        8) "$DDAR" run >/dev/null 2>&1 && notify "DDAR reloaded" ;;
+        9) popup_power ;;
+    esac
+}
+
+# --------------------------------------------------------------- main --
+case "${1:-}" in
+    --dmenu)
+        ANCHOR="center"
+        rofi -dmenu -i -theme "$THEME" -p "" \
+            -theme-str "window { location: center; anchor: center; width: 520px; } textbox-title { content: \"${2:-Select}\"; }" \
+            ${3:+-mesg "$3"}
+        exit ;;
+    launcher) exec "$DDAR" launcher ;;
+esac
+
+# Toggle: a second click on a bar module closes the open popup.
+if pgrep -x rofi >/dev/null; then pkill -x rofi; exit 0; fi
+
+case "${1:-}" in
+    menu) popup_menu ;;
+    network|wifi) popup_network ;;
+    audio|volume) popup_audio ;;
+    power|battery) popup_power ;;
+    system|cpu|memory) popup_system ;;
+    media) popup_media ;;
+    calendar|clock) popup_calendar ;;
+    *) echo "Usage: ddar-popup <menu|launcher|network|audio|power|system|media|calendar>" >&2; exit 1 ;;
+esac

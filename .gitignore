@@ -1,0 +1,15 @@
+# DDAR never writes generated files into the repository; these guard against
+# accidental copies of local state.
+*.tmp
+*.bak
+*.log
+.cache/
+/state/
+/generated/
+
+# editors / OS
+*.swp
+*~
+.DS_Store
+.vscode/
+.idea/
