@@ -5,7 +5,7 @@
  * Source: templates/rofi/launcher-spotlight.rasi in the DDAR repository. */
 
 configuration {
-    show-icons:          @@show_icons@@;
+    show-icons:          true;
     drun-display-format: "{name}[  <span size='small' alpha='65%'>{generic}</span>]";
     hover-select:        true;
     me-select-entry:     "";
@@ -15,9 +15,9 @@ configuration {
 }
 
 * {
-    font:             "@@font@@ @@font_size@@";
+    font:             "Noto Sans 10";
     background-color: transparent;
-    text-color:       @@field_text@@;
+    text-color:       #1d1b17;
     spacing:          0;
 }
 
@@ -26,9 +26,9 @@ window {
     anchor:           north;
     y-offset:         18%;
     width:            640px;
-    background-color: @@field@@@@alpha_hex@@;
+    background-color: #f7f5eeff;
     border:           1px;
-    border-color:     @@face_lo@@;
+    border-color:     #8c877a;
     border-radius:    14px;
     padding:          10px;
 }
@@ -50,9 +50,9 @@ icon-search {
     vertical-align:   0.5;
 }
 entry {
-    font:             "@@font@@ 18";
+    font:             "Noto Sans 18";
     placeholder:      "Search";
-    placeholder-color: @@text_dim@@;
+    placeholder-color: #5e5a50;
     vertical-align:   0.5;
     cursor:           text;
 }
@@ -66,7 +66,7 @@ listview {
     scrollbar:        false;
     spacing:          2px;
     border:           1px 0 0 0;
-    border-color:     @@face_lo@@;
+    border-color:     #8c877a;
     padding:          8px 0 0 0;
 }
 
@@ -77,11 +77,11 @@ element {
     cursor:           pointer;
 }
 element normal.active, element alternate.active {
-    text-color:       @@accent@@;
+    text-color:       #1d6a70;
 }
 element selected.normal, element selected.active {
-    background-color: @@accent@@;
-    text-color:       @@accent_text@@;
+    background-color: #1d6a70;
+    text-color:       #ffffff;
 }
 element-icon {
     size:             28px;
