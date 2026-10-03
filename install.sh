@@ -162,8 +162,14 @@ if [[ -z "$shell_pids" && -r "$HYPR_CONF" ]] && grep -qE '^[[:space:]]*exec(-onc
 fi
 if [[ -n "$shell_pids" ]]; then
     warn "A desktop shell is in use: $shell_pids (e.g. DankMaterialShell)."
-    msg "  It draws its own wallpaper, so DDAR will NOT start a wallpaper program."
-    [[ "$(cfg WALLPAPER_BACKEND)" == auto ]] && config_set WALLPAPER_BACKEND none && ok "WALLPAPER_BACKEND=none"
+    if have dms; then
+        msg "  DankMaterialShell draws the wallpaper: DDAR will set wallpapers through"
+        msg "  'dms ipc' instead of starting its own wallpaper program."
+        [[ "$(cfg WALLPAPER_BACKEND)" == auto ]] && config_set WALLPAPER_BACKEND dms && ok "WALLPAPER_BACKEND=dms"
+    else
+        msg "  It draws its own wallpaper, so DDAR will NOT start a wallpaper program."
+        [[ "$(cfg WALLPAPER_BACKEND)" == auto ]] && config_set WALLPAPER_BACKEND none && ok "WALLPAPER_BACKEND=none"
+    fi
     msg "  It probably has its own bar too; DDAR's Waybar would be a second bar."
 else
     ok "No Quickshell-based desktop shell detected"

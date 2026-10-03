@@ -5,17 +5,24 @@ WP_EXT_RE='\.(png|jpe?g|webp)$'
 
 wallpaper_dir() { expand_path "$(cfg WALLPAPER_DIR)"; }
 
-# All candidate wallpapers: user directory first, then bundled ones.
+# All candidate wallpapers: user directory first (plus the folder of the
+# wallpaper DankMaterialShell shows), then bundled ones.
 wallpaper_list() {
-    local dir; dir="$(wallpaper_dir)"
+    local dir dmsdir="" d
+    dir="$(wallpaper_dir)"
+    d="$(dms_wallpaper 2>/dev/null)" && dmsdir="$(dirname "$d")"
     {
-        [[ -d "$dir" ]] && find -L "$dir" -maxdepth 2 -type f -printf '%p\n' 2>/dev/null | grep -iE "$WP_EXT_RE" | sort
+        for d in "$dir" "$dmsdir"; do
+            [[ -n "$d" && -d "$d" ]] && find -L "$d" -maxdepth 2 -type f -printf '%p\n' 2>/dev/null | grep -iE "$WP_EXT_RE" | sort
+        done
         find "$DDAR_ROOT/assets/wallpapers" -maxdepth 1 -type f -printf '%p\n' 2>/dev/null | grep -iE "$WP_EXT_RE" | sort
     } | awk '!seen[$0]++'
 }
 
 wallpaper_current() {
-    local w; w="$(expand_path "$(cfg WALLPAPER)")"
+    local w
+    if [[ "$(wallpaper_backend)" == dms ]] && w="$(dms_wallpaper)"; then printf '%s' "$w"; return; fi
+    w="$(expand_path "$(cfg WALLPAPER)")"
     if [[ -n "$w" && -r "$w" ]]; then printf '%s' "$w"
     else printf '%s' "$DDAR_ROOT/assets/wallpapers/ddar-teal.png"; fi
 }
@@ -30,12 +37,15 @@ desktop_shell_running() {
 wallpaper_backend() {
     local b; b="$(cfg WALLPAPER_BACKEND)"
     if [[ "$b" == auto ]]; then
-        # A desktop shell (DankMaterialShell and other Quickshell shells) draws
-        # its own wallpaper; a second wallpaper program would cover it.
+        # DankMaterialShell draws the wallpaper itself: set it through DMS.
+        # Other desktop shells do the same with no known interface: leave
+        # them alone, a second wallpaper program would cover theirs.
+        if have dms && desktop_shell_running >/dev/null; then echo dms; return; fi
         desktop_shell_running >/dev/null && { echo none; return; }
         for b in awww swww swaybg hyprpaper; do have "$b" && { echo "$b"; return; }; done
         echo none; return
     fi
+    if [[ "$b" == dms ]] && ! have dms; then warn "WALLPAPER_BACKEND=dms but the dms command is not installed"; echo none; return; fi
     if [[ "$b" != none ]] && ! have "$b"; then warn "WALLPAPER_BACKEND=$b but '$b' is not installed"; echo none; return; fi
     echo "$b"
 }
@@ -69,6 +79,9 @@ wallpaper_apply() {
             # hyprpaper < 0.8 needs preload first; >= 0.8 ignores/rejects it.
             hyprctl hyprpaper preload "$f" >/dev/null 2>&1 || true
             hyprctl hyprpaper wallpaper ",$f" >/dev/null 2>&1 || warn "hyprpaper could not set $f"
+            ;;
+        dms)
+            timeout 5 dms ipc call wallpaper set "$f" >/dev/null 2>&1 || warn "DankMaterialShell did not accept the wallpaper (dms ipc call wallpaper set)"
             ;;
         none) ;;
     esac
@@ -116,14 +129,29 @@ wallpaper_random() {
     wallpaper_set "${list[RANDOM % ${#list[@]}]}"
 }
 
+# Cached preview image for the picker (ImageMagick); the original file is
+# used when ImageMagick is missing. Cache key: path + modification time.
+wallpaper_thumb() {
+    local f="$1" key thumb tool=""
+    have magick && tool=magick
+    [[ -z "$tool" ]] && have convert && tool=convert
+    [[ -n "$tool" ]] || { printf '%s' "$f"; return; }
+    key="$(printf '%s %s' "$f" "$(stat -c %Y "$f" 2>/dev/null)" | cksum | cut -d' ' -f1)"
+    thumb="$DDAR_CACHE_DIR/thumbs/$key.png"
+    if [[ ! -s "$thumb" ]]; then
+        mkdir -p "$DDAR_CACHE_DIR/thumbs"
+        "$tool" "${f}[0]" -thumbnail '192x108^' -gravity center -extent 192x108 "$thumb" 2>/dev/null || { printf '%s' "$f"; return; }
+    fi
+    printf '%s' "$thumb"
+}
+
 # Interactive picker: rofi inside a session, numbered list in a terminal.
 wallpaper_pick() {
     local -a list; local choice i
     mapfile -t list < <(wallpaper_list)
     ((${#list[@]})) || die "No wallpapers found. Put images in $(wallpaper_dir)"
     if [[ ! -t 0 ]] && in_wayland && have rofi; then
-        choice="$(printf '%s\n' "${list[@]}" | "$DDAR_SCRIPTS/ddar-popup" --dmenu "Wallpapers" "Pick a wallpaper")" || return 0
-        [[ -n "$choice" ]] && wallpaper_set "$choice"
+        "$DDAR_SCRIPTS/ddar-popup" wallpapers
         return
     fi
     msg "Current: $(wallpaper_current)"

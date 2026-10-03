@@ -76,6 +76,18 @@ t "dynamic without matugen keeps its fallback colours" bash -c '
     "$0" generate 2>&1 | grep -q "needs matugen" && grep -qx "source=theme" "$1/palette.env"' "$DDAR" "$G"
 "$DDAR" config set THEME retro >/dev/null 2>&1; "$DDAR" config set WALLPAPER "" >/dev/null 2>&1; "$DDAR" config set MATUGEN accent >/dev/null 2>&1
 
+# --- lock screen and title bars ----------------------------------------------
+t "hyprlock config is generated with balanced blocks" bash -c '
+    f="$0/hyprlock/hyprlock.conf"; [[ -s "$f" ]] && ! grep -q "@@" "$f" &&
+    awk "/\{\$/{d++} /^[[:space:]]*\}/{d--} END{exit d!=0}" "$f" && grep -q "^input-field {" "$f"' "$G"
+t "title bars off by default (no plugin config)" bash -c '! grep -q "hyprbars" "$0/titlebars.conf"' "$H"
+t "title bars: floating generates the no-bar rule" bash -c '
+    "$0" config set TITLEBARS floating && "$0" generate && grep -q "hyprbars-button" "$1/titlebars.conf" &&
+    grep -q "match:float = 0" "$1/titlebars-rules.conf"' "$DDAR" "$H"
+t "title bars: all has no rule" bash -c '"$0" config set TITLEBARS all && "$0" generate && ! grep -q "match:float" "$1/titlebars-rules.conf"' "$DDAR" "$H"
+t "ddar titlebars refuses without the plugin" not "$DDAR" titlebars on
+"$DDAR" config set TITLEBARS off >/dev/null 2>&1; "$DDAR" generate >/dev/null 2>&1
+
 # --- configuration -----------------------------------------------------------
 t "config rejects out-of-range values" not "$DDAR" config set FONT_SIZE 99
 t "config rejects unknown modules" not "$DDAR" config set BAR_RIGHT "cpu nonsense"

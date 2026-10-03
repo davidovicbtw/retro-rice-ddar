@@ -63,6 +63,24 @@ expect "media: markup in titles is escaped" "$FAKE_LOG" "Something &lt;About&gt;
 expect "media: play/pause" "$FAKE_CMDS" "playerctl -p spotify play-pause"
 no_stderr media
 
+popup session "4 0"
+expect "power dialog: shut down after confirmation" "$FAKE_CMDS" "systemctl poweroff"
+popup session "3 1"
+if grep -q reboot "$FAKE_CMDS"; then fail=$((fail + 1)); echo "FAIL power dialog: reboot ran although cancelled"
+else pass=$((pass + 1)); echo "ok   power dialog: cancelled reboot does nothing"; fi
+popup session "1 0"
+expect "power dialog: log out" "$FAKE_CMDS" "hyprctl dispatch exit"
+popup session "0"
+expect "power dialog: lock uses the DDAR hyprlock config" "$FAKE_CMDS" "hyprlock -c $HOME/.local/state/ddar/hyprlock/hyprlock.conf"
+expect "power dialog: five buttons" "$FAKE_LOG" "Shut down|"
+
+"$ROOT/bin/ddar" config set WALLPAPER_BACKEND dms >/dev/null
+popup wallpapers "0"
+expect "wallpaper picker: rows carry a preview image" "$FAKE_LOG" "icon"
+expect "wallpaper picker: sets the wallpaper through DMS" "$FAKE_CMDS" "dms ipc call wallpaper set "
+popup menu "10"
+expect "DDAR menu: lock screen entry" "$FAKE_CMDS" "hyprlock -c"
+
 popup calendar "ESC"
 no_stderr calendar
 popup system "ESC"

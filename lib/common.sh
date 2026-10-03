@@ -80,7 +80,7 @@ DDAR_SCHEMA=(
 "ACCENT|colororauto|auto|Accent colour override (#rrggbb or auto)"
 "WALLPAPER_DIR|path|~/Pictures/Wallpapers|Directory scanned for wallpapers"
 "WALLPAPER|path||Current wallpaper (set by: ddar wallpaper)"
-"WALLPAPER_BACKEND|enum:auto,awww,swww,swaybg,hyprpaper,none|auto|Program used to draw the wallpaper"
+"WALLPAPER_BACKEND|enum:auto,dms,awww,swww,swaybg,hyprpaper,none|auto|Program used to draw the wallpaper (dms = DankMaterialShell)"
 "FONT|fontname|Noto Sans|UI font family"
 "FONT_SIZE|int:8:16|10|UI font size (pt)"
 "MONO_FONT|fontname|monospace|Monospace font (terminal, popups)"
@@ -100,6 +100,7 @@ DDAR_SCHEMA=(
 "NOTIFICATIONS|enum:auto,mako,off|auto|Start mako if no notification daemon is running"
 "WEATHER_LOCATION|text||Weather location for the weather widget (empty = by IP)"
 "AUTOSTART|enum:on,off|on|Start DDAR from Hyprland (exec-once)"
+"TITLEBARS|enum:off,floating,all|off|Retro window title bars (needs the hyprbars plugin; see: ddar titlebars)"
 )
 
 # All known bar modules (widgets). Kept in one place so generator and TUI agree.

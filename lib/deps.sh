@@ -22,6 +22,8 @@ DDAR_DEPS=(
 "curl|curl|optional|weather widget"
 "pavucontrol|pavucontrol|optional|full audio mixer from the audio popup"
 "btop|btop|optional|process viewer from the system popup"
+"hyprlock|hyprlock|recommended|the DDAR lock screen (ddar lock)"
+"magick|imagemagick|optional|wallpaper previews in the picker"
 "inotifywait|inotify-tools|optional|theme 'dynamic' follows DankMaterialShell wallpaper changes live"
 )
 

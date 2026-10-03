@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ddar-popup - small Rofi-based popups opened from the DDAR bar.
-#   ddar-popup <menu|launcher|network|audio|power|system|media|calendar>
+#   ddar-popup <menu|launcher|network|audio|power|system|media|calendar|session|wallpapers>
 #   ddar-popup --dmenu TITLE [MESSAGE]     generic picker (stdin -> stdout)
 # Clicking a module while its popup is open closes it (toggle).
 set -uo pipefail
@@ -11,6 +11,8 @@ export DDAR_ROOT
 source "$DDAR_ROOT/lib/common.sh"
 # shellcheck source=../lib/generate.sh
 source "$DDAR_ROOT/lib/generate.sh"
+# shellcheck source=../lib/wallpaper.sh
+source "$DDAR_ROOT/lib/wallpaper.sh"
 config_load
 
 DDAR="$DDAR_ROOT/bin/ddar"
@@ -209,7 +211,7 @@ popup_power() {
     r="$(menu "Power" "$mesg" "${rows[@]}")" || return
     case "${actions[r]}" in
         profile:*) powerprofilesctl set "${actions[r]#profile:}" ;;
-        lock) if have hyprlock; then spawn hyprlock; else loginctl lock-session; fi ;;
+        lock) spawn "$DDAR" lock ;;
         suspend) systemctl suspend ;;
         logout) confirm_menu "Log out of Hyprland?" && hyprctl dispatch exit ;;
         reboot) confirm_menu "Reboot now?" && systemctl reboot ;;
@@ -285,12 +287,52 @@ popup_calendar() {
     done
 }
 
+# ------------------------------------------------- power dialog (session) --
+# Centred "Turn off computer" dialog with icon buttons; risky actions ask.
+popup_session() {
+    local r
+    ANCHOR="center"
+    # Symbols instead of icon names: identical on every icon theme
+    # (DejaVu Sans / Noto Sans Symbols2). Two-line rows, so '|' separates them.
+    r="$(printf "<span size='22pt'>%s</span>\n%s|" "⚿" "Lock" "⇥" "Log out" "☾" "Suspend" "↻" "Reboot" "⏻" "Shut down" |
+         rofi -dmenu -no-custom -format i -sep '|' -eh 2 -markup-rows \
+              -theme "$DDAR_GEN_DIR/rofi/power.rasi" -p "" \
+              -mesg "What do you want the computer to do?")" || return
+    case "$r" in
+        0) exec "$DDAR" lock ;;
+        1) confirm_menu "Log out of Hyprland? Unsaved work will be lost." && hyprctl dispatch exit ;;
+        2) systemctl suspend ;;
+        3) confirm_menu "Restart the computer now?" && systemctl reboot ;;
+        4) confirm_menu "Shut down the computer now?" && systemctl poweroff ;;
+    esac
+}
+
+# ------------------------------------------------------ wallpaper picker --
+# Name on the left, cached preview on the right (see wallpaper.rasi).
+popup_wallpapers() {
+    local -a list=(); local f cur sel=0 i r name
+    mapfile -t list < <(wallpaper_list)
+    if ((${#list[@]} == 0)); then
+        ANCHOR="center"; menu "Wallpapers" "No images in $(esc "$(wallpaper_dir)")" "Close" >/dev/null; return
+    fi
+    cur="$(wallpaper_current)"
+    for i in "${!list[@]}"; do [[ "${list[i]}" == "$cur" ]] && sel=$i; done
+    r="$(for f in "${list[@]}"; do
+            name="${f##*/}"; name="${name%.*}"
+            if [[ "$f" == "$cur" ]]; then name="● $name"; else name="   $name"; fi
+            printf '%s\0icon\x1f%s\n' "$name" "$(wallpaper_thumb "$f")"
+         done | rofi -dmenu -i -no-custom -format i -selected-row "$sel" \
+                     -theme "$DDAR_GEN_DIR/rofi/wallpaper.rasi" -p "")" || return
+    "$DDAR" wallpaper set "${list[r]}" >/dev/null 2>&1 && notify "Wallpaper: ${list[r]##*/}"
+}
+
 # ---------------------------------------------------------- DDAR menu --
 popup_menu() {
     local r t rows themes=()
     ANCHOR="north west"
     rows=("Programs..." "Run command..." "Windows..." "Themes ▸" "Wallpaper ▸"
-          "Keyboard shortcuts" "Settings (TUI)..." "System ▸" "Reload DDAR" "Power ▸")
+          "Keyboard shortcuts" "Settings (TUI)..." "System ▸" "Reload DDAR" "Power..." "Lock screen")
+    [[ "$(cfg TITLEBARS)" != off ]] && rows+=("Show minimized windows")
     r="$(menu "DDAR" "" "${rows[@]}")" || return
     case "$r" in
         0) exec "$DDAR" launcher ;;
@@ -303,10 +345,10 @@ popup_menu() {
             t="$(menu "Themes" "" "${labels[@]}")" || return
             "$DDAR" theme set "${themes[t]}" >/dev/null && notify "Theme: ${themes[t]}" ;;
         4)
-            t="$(menu "Wallpaper" "" "Next" "Previous" "Random" "Choose...")" || return
+            t="$(menu "Wallpaper" "" "Choose with preview..." "Next" "Previous" "Random")" || return
             case "$t" in
-                0) "$DDAR" wallpaper next >/dev/null ;; 1) "$DDAR" wallpaper prev >/dev/null ;;
-                2) "$DDAR" wallpaper random >/dev/null ;; 3) "$DDAR" wallpaper </dev/null >/dev/null ;;
+                0) popup_wallpapers ;; 1) "$DDAR" wallpaper next >/dev/null ;;
+                2) "$DDAR" wallpaper prev >/dev/null ;; 3) "$DDAR" wallpaper random >/dev/null ;;
             esac ;;
         5)
             local list; list="$("$DDAR" shortcut list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | head -n -1)"
@@ -315,7 +357,9 @@ popup_menu() {
         6) run_in_terminal "$DDAR" ;;
         7) popup_system ;;
         8) "$DDAR" run >/dev/null 2>&1 && notify "DDAR reloaded" ;;
-        9) popup_power ;;
+        9) popup_session ;;
+        10) exec "$DDAR" lock ;;
+        11) hyprctl dispatch togglespecialworkspace minimized >/dev/null ;;
     esac
 }
 
@@ -341,5 +385,7 @@ case "${1:-}" in
     system|cpu|memory) popup_system ;;
     media) popup_media ;;
     calendar|clock) popup_calendar ;;
-    *) echo "Usage: ddar-popup <menu|launcher|network|audio|power|system|media|calendar>" >&2; exit 1 ;;
+    session) popup_session ;;
+    wallpapers) popup_wallpapers ;;
+    *) echo "Usage: ddar-popup <menu|launcher|network|audio|power|system|media|calendar|session|wallpapers>" >&2; exit 1 ;;
 esac

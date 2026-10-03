@@ -34,7 +34,7 @@ ${C_BOLD}ddar${C_RESET} - DDAR retro desktop for Hyprland (v$DDAR_VERSION)
   ddar theme                   pick a theme interactively
   ddar theme list|current      list themes / show the active theme
   ddar theme set <name>        switch theme
-  ddar wallpaper               pick a wallpaper
+  ddar wallpaper               pick a wallpaper (with previews)
   ddar wallpaper next|prev|random|current|list
   ddar wallpaper set <file>    use a specific image
   ddar config                  settings menu
@@ -43,10 +43,14 @@ ${C_BOLD}ddar${C_RESET} - DDAR retro desktop for Hyprland (v$DDAR_VERSION)
   ddar shortcut add MODS+KEY command...
   ddar shortcut remove <number|MODS+KEY>
   ddar shortcut edit|check
+  ddar lock                    lock the screen (retro hyprlock dialog)
+  ddar power                   power dialog: lock, log out, suspend, reboot, shut down
   ddar launcher                open the application launcher
   ddar menu                    open the DDAR menu (same as the bar button)
   ddar popup <name>            open a bar popup: network audio power system
                                media calendar menu
+  ddar titlebars [on|all|off]  retro window title bars (hyprbars plugin)
+  ddar minimized               show/hide windows minimised from a title bar
   ddar update [--check]        update DDAR from its git repository
   ddar info                    system information
   ddar doctor                  check dependencies and generated files
@@ -64,6 +68,50 @@ ddar_launcher() {
     [[ -r "$DDAR_GEN_DIR/rofi/launcher.rasi" ]] || generate_all
     if pgrep -x rofi >/dev/null; then pkill -x rofi; return 0; fi   # toggle
     rofi -show drun -modes "drun,run,window" -theme "$DDAR_GEN_DIR/rofi/launcher.rasi"
+}
+
+ddar_lock() {
+    [[ -r "$DDAR_GEN_DIR/hyprlock/hyprlock.conf" ]] || generate_all
+    if have hyprlock; then
+        pgrep -x hyprlock >/dev/null && return 0          # already locked
+        exec hyprlock -c "$DDAR_GEN_DIR/hyprlock/hyprlock.conf"
+    fi
+    notify "Install hyprlock for the DDAR lock screen (sudo pacman -S hyprlock)"
+    warn "hyprlock is not installed - asking the session to lock instead (needs a locker such as hypridle)"
+    loginctl lock-session
+}
+
+# ddar titlebars [on|floating|all|off|status]
+ddar_titlebars() {
+    local want="${1:-status}" loaded=0
+    in_hyprland && hyprctl plugin list 2>/dev/null | grep -qi hyprbars && loaded=1
+    case "$want" in
+        status)
+            msg "TITLEBARS=$(cfg TITLEBARS)   hyprbars plugin: $( ((loaded)) && echo loaded || echo 'not loaded')"
+            ((loaded)) || cat <<EOF
+
+Title bars use Hyprland's official hyprbars plugin. Install it once
+(hyprpm downloads and compiles hyprland-plugins from GitHub):
+
+  sudo pacman -S --needed cmake meson cpio pkgconf git gcc
+  hyprpm update
+  hyprpm add https://github.com/hyprwm/hyprland-plugins
+  hyprpm enable hyprbars
+
+Then:  ddar titlebars on        (floating windows only)
+       ddar titlebars all       (every window)
+EOF
+            ;;
+        on|floating|all)
+            [[ "$want" == on ]] && want=floating
+            if ((loaded == 0)); then
+                err "The hyprbars plugin is not loaded, so title bars would only cause config errors."
+                ddar_titlebars status; return 1
+            fi
+            config_set TITLEBARS "$want"; ok "TITLEBARS=$want"; ddar_apply_theme_change ;;
+        off) config_set TITLEBARS off; ok "Title bars off"; ddar_apply_theme_change ;;
+        *) die "Usage: ddar titlebars [on|floating|all|off|status]" ;;
+    esac
 }
 
 ddar_info() {
@@ -190,6 +238,10 @@ main() {
         config|settings) cmd_config "$@" ;;
         shortcut|shortcuts|keys) cmd_shortcut "$@" ;;
         launcher|apps) ddar_launcher ;;
+        lock) ddar_lock ;;
+        power|session) exec "$DDAR_SCRIPTS/ddar-popup" session ;;
+        titlebars) ddar_titlebars "$@" ;;
+        minimized|minimised) in_hyprland && hyprctl dispatch togglespecialworkspace minimized >/dev/null ;;
         menu) exec "$DDAR_SCRIPTS/ddar-popup" menu ;;
         popup) exec "$DDAR_SCRIPTS/ddar-popup" "$@" ;;
         update) ddar_update "$@" ;;
