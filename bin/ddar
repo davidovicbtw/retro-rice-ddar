@@ -101,9 +101,11 @@ ddar_doctor() {
         err "waybar config is not valid JSON"; bad=1
     fi
     shortcuts_check || bad=1
-    if [[ -r "$DDAR_GEN_DIR/logs/waybar.log" ]] && grep -qi 'error' "$DDAR_GEN_DIR/logs/waybar.log"; then
-        warn "Waybar log has errors:"; grep -i 'error' "$DDAR_GEN_DIR/logs/waybar.log" | tail -n 5 >&2
-    fi
+    # Only Waybar's own "[error]" lines: apps opened from the bar inherit its
+    # log, and a tray item without an icon is harmless.
+    local wlog="$DDAR_GEN_DIR/logs/waybar.log" werr=""
+    [[ -r "$wlog" ]] && werr="$(grep -F '] [error] ' "$wlog" | grep -vF 'No icon name or pixmap given' | tail -n 5)"
+    if [[ -n "$werr" ]]; then warn "Waybar log has errors:"; printf '%s\n' "$werr" >&2; fi
     return "$bad"
 }
 
