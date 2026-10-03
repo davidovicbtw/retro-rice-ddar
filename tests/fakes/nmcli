@@ -1,0 +1,12 @@
+#!/bin/bash
+# Test double: records its arguments; output mimics the real tool.
+echo "nmcli $*" >> "$FAKE_CMDS"
+case "$*" in
+ "radio wifi") echo enabled ;;
+ "-t -f DEVICE,STATE device") printf 'wlan0:connected\nlo:connected (externally)\n' ;;
+ "-g GENERAL.CONNECTION device show wlan0") printf 'Home\\:Net\n' ;;
+ "-g IP4.ADDRESS device show wlan0") echo "192.168.1.20/24" ;;
+ "-t -f IN-USE,SIGNAL,SECURITY,SSID device wifi list --rescan no") printf '*:78:WPA2:Home\\:Net\n :55:WPA2 WPA3:Cafe Free\n :40::OpenSpot\n :30:WPA2:Cafe Free\n' ;;
+ "-g NAME connection show") printf 'Home\\:Net\nlo\n' ;;
+ *) exit 0 ;;
+esac

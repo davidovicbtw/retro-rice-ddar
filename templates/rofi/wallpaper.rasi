@@ -1,0 +1,40 @@
+/* DDAR wallpaper picker - name on the left, preview on the right.
+ * Opened by: ddar wallpaper   Generated, do not edit. */
+@import "base.rasi"
+
+textbox-title {
+    content:          "DDAR  Wallpapers";
+}
+
+window {
+    location:         center;
+    anchor:           center;
+    x-offset:         0;
+    y-offset:         0;
+    width:            560px;
+}
+configuration {
+    show-icons:       true;
+}
+listview {
+    lines:            5;
+    fixed-height:     false;
+    scrollbar:        true;
+}
+element {
+    children:         [ element-text, element-icon ];
+    padding:          4px 6px;
+    spacing:          10px;
+}
+element-text {
+    vertical-align:   0.5;
+}
+element-icon {
+    size:             80px;
+}
+textbox-hint {
+    content:          "Enter: set wallpaper   Esc: close";
+}
+entry {
+    placeholder:      "filter wallpapers...";
+}

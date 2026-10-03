@@ -1,0 +1,61 @@
+/* DDAR power dialog ("Turn off computer") - opened by: ddar power
+ * Generated, do not edit. */
+@import "base.rasi"
+
+textbox-title {
+    content:          "DDAR  Turn Off Computer";
+}
+
+window {
+    location:         center;
+    anchor:           center;
+    x-offset:         0;
+    y-offset:         0;
+    width:            520px;
+}
+mainbox {
+    children:         [ textbox-title, message, listview, textbox-hint ];
+}
+message {
+    margin:           4px 8px 0 8px;
+    border:           0;
+    background-color: transparent;
+}
+textbox {
+    text-color:       @fg;
+    font:             "@@font@@ @@font_size@@";
+}
+configuration {
+    show-icons:       false;
+}
+listview {
+    margin:           0 8px;
+    columns:          5;
+    lines:            1;
+    fixed-columns:    true;
+    scrollbar:        false;
+    spacing:          6px;
+    padding:          8px 6px;
+    background-color: @face-solid;
+    border:           0;
+}
+element {
+    orientation:      vertical;
+    padding:          8px 2px 6px 2px;
+    spacing:          6px;
+    border:           1px;
+    border-color:     @face-solid;
+    text-color:       @fg;
+}
+element selected.normal, element selected.active, element selected.urgent {
+    border-color:     @frame;
+    background-color: @accent;
+    text-color:       @accent-fg;
+}
+element-text {
+    horizontal-align: 0.5;
+    markup:           true;
+}
+textbox-hint {
+    content:          "Arrows/mouse: choose   Enter: confirm   Esc: cancel";
+}

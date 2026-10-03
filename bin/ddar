@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+# ddar - command line and TUI for the DDAR retro Hyprland desktop.
+# Run `ddar help` for the command reference.
+set -uo pipefail
+
+# Resolve the real location (ddar is usually a symlink in ~/.local/bin).
+DDAR_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export DDAR_ROOT
+
+# shellcheck source=../lib/common.sh
+source "$DDAR_ROOT/lib/common.sh"
+# shellcheck source=../lib/generate.sh
+source "$DDAR_ROOT/lib/generate.sh"
+# shellcheck source=../lib/shortcuts.sh
+source "$DDAR_ROOT/lib/shortcuts.sh"
+# shellcheck source=../lib/wallpaper.sh
+source "$DDAR_ROOT/lib/wallpaper.sh"
+# shellcheck source=../lib/run.sh
+source "$DDAR_ROOT/lib/run.sh"
+# shellcheck source=../lib/update.sh
+source "$DDAR_ROOT/lib/update.sh"
+# shellcheck source=../lib/deps.sh
+source "$DDAR_ROOT/lib/deps.sh"
+# shellcheck source=../lib/tui.sh
+source "$DDAR_ROOT/lib/tui.sh"
+
+ddar_help() {
+    cat <<EOF
+${C_BOLD}ddar${C_RESET} - DDAR retro desktop for Hyprland (v$DDAR_VERSION)
+
+  ddar                         open the interactive menu (TUI)
+  ddar run [--replace]         generate configs and start/reload the bar,
+                               notifications, wallpaper and Hyprland
+  ddar theme                   pick a theme interactively
+  ddar theme list|current      list themes / show the active theme
+  ddar theme set <name>        switch theme
+  ddar wallpaper               pick a wallpaper (with previews)
+  ddar wallpaper next|prev|random|current|list
+  ddar wallpaper set <file>    use a specific image
+  ddar config                  settings menu
+  ddar config list|get KEY|set KEY VALUE|edit|path
+  ddar shortcut list           show DDAR keyboard shortcuts
+  ddar shortcut add MODS+KEY command...
+  ddar shortcut remove <number|MODS+KEY>
+  ddar shortcut edit|check
+  ddar lock                    lock the screen (retro hyprlock dialog)
+  ddar power                   power dialog: lock, log out, suspend, reboot, shut down
+  ddar launcher                open the application launcher
+  ddar menu                    open the DDAR menu (same as the bar button)
+  ddar popup <name>            open a bar popup: network audio power system
+                               media calendar menu
+  ddar titlebars [on|all|off]  retro window title bars (hyprbars plugin)
+  ddar minimized               show/hide windows minimised from a title bar
+  ddar update [--check]        update DDAR from its git repository
+  ddar info                    system information
+  ddar doctor                  check dependencies and generated files
+  ddar uninstall               remove DDAR (runs uninstall.sh)
+  ddar version
+
+User settings:   $DDAR_CONFIG_FILE
+Shortcuts:       $DDAR_SHORTCUTS_FILE
+Generated files: $DDAR_GEN_DIR  and  $DDAR_HYPR_DIR
+EOF
+}
+
+ddar_launcher() {
+    have rofi || die "rofi is not installed"
+    [[ -r "$DDAR_GEN_DIR/rofi/launcher.rasi" ]] || generate_all
+    if pgrep -x rofi >/dev/null; then pkill -x rofi; return 0; fi   # toggle
+    rofi -show drun -modes "drun,run,window" -theme "$DDAR_GEN_DIR/rofi/launcher.rasi"
+}
+
+ddar_lock() {
+    [[ -r "$DDAR_GEN_DIR/hyprlock/hyprlock.conf" ]] || generate_all
+    if have hyprlock; then
+        pgrep -x hyprlock >/dev/null && return 0          # already locked
+        exec hyprlock -c "$DDAR_GEN_DIR/hyprlock/hyprlock.conf"
+    fi
+    notify "Install hyprlock for the DDAR lock screen (sudo pacman -S hyprlock)"
+    warn "hyprlock is not installed - asking the session to lock instead (needs a locker such as hypridle)"
+    loginctl lock-session
+}
+
+# ddar titlebars [on|floating|all|off|status]
+ddar_titlebars() {
+    local want="${1:-status}" loaded=0
+    in_hyprland && hyprctl plugin list 2>/dev/null | grep -qi hyprbars && loaded=1
+    case "$want" in
+        status)
+            msg "TITLEBARS=$(cfg TITLEBARS)   hyprbars plugin: $( ((loaded)) && echo loaded || echo 'not loaded')"
+            ((loaded)) || cat <<EOF
+
+Title bars use Hyprland's official hyprbars plugin. Install it once
+(hyprpm downloads and compiles hyprland-plugins from GitHub):
+
+  sudo pacman -S --needed cmake meson cpio pkgconf git gcc
+  hyprpm update
+  hyprpm add https://github.com/hyprwm/hyprland-plugins
+  hyprpm enable hyprbars
+
+Then:  ddar titlebars on        (floating windows only)
+       ddar titlebars all       (every window)
+EOF
+            ;;
+        on|floating|all)
+            [[ "$want" == on ]] && want=floating
+            if ((loaded == 0)); then
+                err "The hyprbars plugin is not loaded, so title bars would only cause config errors."
+                ddar_titlebars status; return 1
+            fi
+            config_set TITLEBARS "$want"; ok "TITLEBARS=$want"; ddar_apply_theme_change ;;
+        off) config_set TITLEBARS off; ok "Title bars off"; ddar_apply_theme_change ;;
+        *) die "Usage: ddar titlebars [on|floating|all|off|status]" ;;
+    esac
+}
+
+ddar_info() {
+    local cpu mem up kernel gpu hv wb
+    cpu="$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null | head -n1)"
+    mem="$(awk '/MemTotal/ {t=$2} /MemAvailable/ {a=$2} END {printf "%.1f / %.1f GiB", (t-a)/1048576, t/1048576}' /proc/meminfo 2>/dev/null)"
+    up="$(uptime -p 2>/dev/null | sed 's/^up //')"
+    kernel="$(uname -r)"
+    hv="$(hyprctl version -j 2>/dev/null | jq -r '.tag // .version // empty' 2>/dev/null)"
+    wb="$(waybar --version 2>/dev/null | head -n1)"
+    gpu=""; have lspci && gpu="$(lspci 2>/dev/null | grep -Ei 'vga|3d|display' | head -n1 | sed 's/^[^:]*: //')"
+    [[ -t 1 ]] && _tui_title "System Information"
+    printf '  %-12s %s\n' \
+        "OS" "$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-unknown}")" \
+        "Kernel" "$kernel" "Uptime" "${up:-?}" "CPU" "${cpu:-?}" "Memory" "${mem:-?}" \
+        "GPU" "${gpu:-?}" "Hyprland" "${hv:-not running / not found}" "Waybar" "${wb:-not found}" \
+        "Theme" "$(cfg THEME) ($(sed -n 's/^source=//p' "$DDAR_GEN_DIR/palette.env" 2>/dev/null || echo 'not generated'))" \
+        "Wallpaper" "$(wallpaper_current)" "DDAR" "$DDAR_VERSION at $DDAR_ROOT"
+}
+
+ddar_doctor() {
+    local bad=0 f
+    info "Dependencies"
+    deps_report || bad=1
+    info "Session"
+    if in_hyprland; then ok "Inside Hyprland"; else warn "Not inside a Hyprland session (some checks skipped)"; fi
+    info "Integration"
+    local hconf="$XDG_CONFIG_HOME/hypr/hyprland.conf"
+    if [[ -r "$hconf" ]] && grep -qF "$DDAR_HYPR_DIR/ddar.conf" "$hconf"; then ok "hyprland.conf sources DDAR"
+    else warn "hyprland.conf does not source $DDAR_HYPR_DIR/ddar.conf (run ./install.sh)"; fi
+    for f in waybar/config.jsonc waybar/style.css rofi/launcher.rasi rofi/popup.rasi kitty/colors.conf; do
+        if [[ -r "$DDAR_GEN_DIR/$f" ]]; then ok "generated: $f"; else warn "not generated yet: $f (run: ddar run)"; bad=1; fi
+    done
+    if [[ -r "$DDAR_GEN_DIR/waybar/config.jsonc" ]] && ! jq empty "$DDAR_GEN_DIR/waybar/config.jsonc" 2>/dev/null; then
+        err "waybar config is not valid JSON"; bad=1
+    fi
+    shortcuts_check || bad=1
+    # Only Waybar's own "[error]" lines: apps opened from the bar inherit its
+    # log, and a tray item without an icon is harmless.
+    local wlog="$DDAR_GEN_DIR/logs/waybar.log" werr=""
+    [[ -r "$wlog" ]] && werr="$(grep -F '] [error] ' "$wlog" | grep -vF 'No icon name or pixmap given' | tail -n 5)"
+    if [[ -n "$werr" ]]; then warn "Waybar log has errors:"; printf '%s\n' "$werr" >&2; fi
+    return "$bad"
+}
+
+cmd_theme() {
+    local sub="${1:-}" n f
+    case "$sub" in
+        list)
+            for n in $(theme_names); do
+                f="$(theme_path "$n")"
+                printf '%s %-12s %s\n' "$([[ "$n" == "$(cfg THEME)" ]] && echo '*' || echo ' ')" "$n" "$(theme_meta "$f" DESCRIPTION)"
+            done ;;
+        current) printf '%s\n' "$(cfg THEME)" ;;
+        set)
+            [[ -n "${2:-}" ]] || die "Usage: ddar theme set <name>   (see: ddar theme list)"
+            theme_path "$2" >/dev/null || die "No such theme: $2 (see: ddar theme list)"
+            config_set THEME "$2"
+            ok "Theme: $2"
+            ddar_apply_theme_change ;;
+        "") if [[ -t 0 ]]; then tui_theme; else cmd_theme list; fi ;;
+        *) die "Usage: ddar theme [list|current|set <name>]" ;;
+    esac
+}
+
+cmd_wallpaper() {
+    case "${1:-}" in
+        "") wallpaper_pick ;;
+        next) wallpaper_step 1 ;;
+        prev|previous) wallpaper_step -1 ;;
+        random) wallpaper_random ;;
+        current) wallpaper_current; echo ;;
+        list) wallpaper_list ;;
+        set) wallpaper_set "${2:-}" ;;
+        apply) wallpaper_apply ;;
+        *) die "Usage: ddar wallpaper [next|prev|random|current|list|set <file>]" ;;
+    esac
+}
+
+cmd_config() {
+    local row k desc
+    case "${1:-}" in
+        "") if [[ -t 0 ]]; then ensure_user_config; tui_settings; else cmd_config list; fi ;;
+        list)
+            for row in "${DDAR_SCHEMA[@]}"; do
+                IFS='|' read -r k _ _ desc <<<"$row"
+                printf '%-18s = %-28s %s# %s%s\n' "$k" "\"$(cfg "$k")\"" "$C_DIM" "$desc" "$C_RESET"
+            done ;;
+        get) config_known_key "${2:-}" || die "Unknown setting: ${2:-} (see: ddar config list)"; cfg "$2"; echo ;;
+        set)
+            [[ $# -ge 3 ]] || die "Usage: ddar config set KEY VALUE"
+            local key="$2"; shift 2
+            config_set "$key" "$*"
+            ok "$key = $*"
+            msg "Apply with: ddar run" ;;
+        edit) ensure_user_config; "${VISUAL:-${EDITOR:-nano}}" "$DDAR_CONFIG_FILE" ;;
+        path) echo "$DDAR_CONFIG_FILE" ;;
+        *) die "Usage: ddar config [list|get KEY|set KEY VALUE|edit|path]" ;;
+    esac
+}
+
+cmd_shortcut() {
+    local sub="${1:-list}"; shift || true
+    case "$sub" in
+        list|ls) shortcuts_list ;;
+        add) ensure_user_config; shortcuts_add "$@" ;;
+        remove|rm|del) shortcuts_remove "${1:-}" ;;
+        edit) shortcuts_edit ;;
+        check) shortcuts_check ;;
+        apply) shortcuts_apply ;;
+        *) die "Usage: ddar shortcut [list|add MODS+KEY cmd|remove N|edit|check]" ;;
+    esac
+}
+
+main() {
+    config_load
+    local cmd="${1:-}"; shift || true
+    case "$cmd" in
+        "") tui_main ;;
+        tui) if [[ -t 0 ]]; then tui_main; else run_in_terminal "$DDAR_ROOT/bin/ddar" tui; fi ;;
+        run|reload) ddar_run "$@" ;;
+        theme|themes) cmd_theme "$@" ;;
+        wallpaper|wp) cmd_wallpaper "$@" ;;
+        config|settings) cmd_config "$@" ;;
+        shortcut|shortcuts|keys) cmd_shortcut "$@" ;;
+        launcher|apps) ddar_launcher ;;
+        lock) ddar_lock ;;
+        power|session) exec "$DDAR_SCRIPTS/ddar-popup" session ;;
+        titlebars) ddar_titlebars "$@" ;;
+        minimized|minimised) in_hyprland && hyprctl dispatch togglespecialworkspace minimized >/dev/null ;;
+        menu) exec "$DDAR_SCRIPTS/ddar-popup" menu ;;
+        popup) exec "$DDAR_SCRIPTS/ddar-popup" "$@" ;;
+        update) ddar_update "$@" ;;
+        info|sysinfo) config_load; ddar_info ;;
+        doctor|check) ddar_doctor ;;
+        uninstall) exec "$DDAR_ROOT/uninstall.sh" "$@" ;;
+        generate) generate_all && ok "Generated" ;;
+        reload-colours) ddar_apply_theme_change ;;   # used by ddar-watch
+        version|-v|--version) echo "ddar $DDAR_VERSION" ;;
+        help|-h|--help) ddar_help ;;
+        *) err "Unknown command: $cmd"; ddar_help; exit 1 ;;
+    esac
+}
+
+main "$@"

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Test double: only records that it was called.
+echo "hyprctl $*" >> "$FAKE_CMDS"

@@ -1,0 +1,143 @@
+/* DDAR Rofi base - shared by launcher and popups. Generated, do not edit. */
+@import "colors.rasi"
+
+configuration {
+    show-icons:          @@show_icons@@;
+    icon-theme:          "hicolor";
+    drun-display-format: "{name}";
+    display-drun:        "Programs";
+    display-run:         "Command";
+    display-window:      "Windows";
+    hover-select:        true;
+    me-select-entry:     "";
+    me-accept-entry:     "MousePrimary";
+}
+
+* {
+    font:             "@@font@@ @@font_size@@";
+    background-color: transparent;
+    text-color:       @fg;
+    spacing:          0;
+}
+
+window {
+    location:         north west;
+    anchor:           north west;
+    x-offset:         2px;
+    y-offset:         @@bar_height@@px;
+    width:            360px;
+    background-color: @face;
+    border:           1px;
+    border-color:     @frame;
+    padding:          0;
+}
+
+mainbox {
+    border:           1px;
+    border-color:     @face-hi;
+    padding:          0 0 3px 0;
+    spacing:          3px;
+    children:         [ textbox-title, inputbar, message, listview, textbox-hint ];
+}
+
+/* title bar: restrained two-stop gradient, bold label */
+textbox-title {
+    expand:           false;
+    content:          "DDAR  Programs";
+    background-image: linear-gradient(to right, @@title_a@@, @@title_b@@);  /* literal colours: rofi gradients reject @variables */
+    text-color:       @accent-fg;
+    padding:          3px 6px;
+    font:             "@@font@@ Bold @@font_size@@";
+}
+
+inputbar {
+    margin:           0 4px;
+    spacing:          4px;
+    children:         [ prompt, entry ];
+}
+prompt {
+    padding:          3px 0;
+    text-color:       @fg;
+}
+entry {
+    background-color: @field;
+    text-color:       @field-fg;
+    border:           1px;
+    border-color:     @face-lo;
+    padding:          2px 4px;
+    placeholder:      "type to search...";
+    placeholder-color: @fg-dim;
+    cursor:           text;
+}
+
+message {
+    margin:           0 4px;
+    padding:          4px;
+    border:           1px;
+    border-color:     @face-lo;
+    background-color: @field;
+}
+textbox {
+    text-color:       @field-fg;
+    font:             "@@mono_font@@ @@font_size@@";
+    markup:           true;
+}
+
+listview {
+    margin:           0 4px;
+    lines:            12;
+    columns:          1;
+    fixed-height:     false;
+    dynamic:          true;
+    scrollbar:        true;
+    border:           1px;
+    border-color:     @face-lo;
+    background-color: @field;
+    padding:          1px;
+}
+scrollbar {
+    width:            10px;
+    handle-width:     10px;
+    handle-color:     @face-lo;
+    background-color: @face-hi;
+    border:           0;
+}
+
+element {
+    padding:          2px 4px;
+    spacing:          6px;
+    background-color: transparent;
+    text-color:       @field-fg;
+    cursor:           pointer;
+}
+element normal.urgent, element alternate.urgent {
+    text-color:       @urgent;
+}
+element normal.active, element alternate.active {
+    text-color:       @accent;
+}
+element selected.normal, element selected.active, element selected.urgent {
+    background-color: @accent;
+    text-color:       @accent-fg;
+}
+element-icon {
+    size:             16px;
+    background-color: transparent;
+    text-color:       inherit;
+    cursor:           inherit;
+}
+element-text {
+    background-color: transparent;
+    text-color:       inherit;
+    vertical-align:   0.5;
+    cursor:           inherit;
+}
+
+textbox-hint {
+    expand:           false;
+    content:          "Enter: open   Esc: close";
+    margin:           0 4px;
+    padding:          1px 2px;
+    text-color:       @fg-dim;
+    font:             "@@font@@ @@font_size@@";
+}

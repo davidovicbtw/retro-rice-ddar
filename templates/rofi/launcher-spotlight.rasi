@@ -1,0 +1,133 @@
+/* DDAR Spotlight launcher for Rofi (>= 1.7).
+ * Spotlight layout (one big search field in the upper third, results
+ * underneath) drawn in the DDAR retro style: square window, 1px bevels,
+ * gradient title bar, sunken search field and result list.
+ * Self-contained: colours are written in, nothing else is imported.
+ *   rofi -show drun -theme /path/to/this/file.rasi
+ * Source: templates/rofi/launcher-spotlight.rasi in the DDAR repository. */
+
+configuration {
+    show-icons:          @@show_icons@@;
+    drun-display-format: "{name}[  <span size='small' alpha='70%'>{generic}</span>]";
+    display-drun:        "Find:";
+    display-run:         "Run:";
+    display-window:      "Window:";
+    hover-select:        true;
+    me-select-entry:     "";
+    me-accept-entry:     "MousePrimary";
+    sort:                true;
+    sorting-method:      "fzf";
+}
+
+* {
+    font:             "@@font@@ @@font_size@@";
+    background-color: transparent;
+    text-color:       @@text@@;
+    spacing:          0;
+}
+
+/* outer frame: dark 1px outline */
+window {
+    location:         north;
+    anchor:           north;
+    y-offset:         18%;
+    width:            600px;
+    background-color: @@face@@@@alpha_hex@@;
+    border:           1px;
+    border-color:     @@frame@@;
+    border-radius:    0;
+    padding:          0;
+}
+
+/* inner highlight edge = the raised bevel */
+mainbox {
+    border:           1px;
+    border-color:     @@face_hi@@;
+    padding:          0 0 4px 0;
+    spacing:          6px;
+    children:         [ textbox-title, inputbar, listview, textbox-hint ];
+}
+
+/* literal colours: rofi gradients reject @variables */
+textbox-title {
+    expand:           false;
+    content:          "DDAR  Find Program";
+    background-image: linear-gradient(to right, @@title_a@@, @@title_b@@);
+    text-color:       @@accent_text@@;
+    padding:          3px 6px;
+    font:             "@@font@@ Bold @@font_size@@";
+}
+
+/* search row: label + sunken field */
+inputbar {
+    margin:           2px 8px 0 8px;
+    spacing:          8px;
+    children:         [ prompt, entry ];
+}
+prompt {
+    vertical-align:   0.5;
+    font:             "@@font@@ Bold @@font_size@@";
+}
+entry {
+    background-color: @@field@@;
+    text-color:       @@field_text@@;
+    border:           1px;
+    border-color:     @@face_lo@@;
+    padding:          5px 6px;
+    font:             "@@font@@ 15";
+    placeholder:      "type a program name...";
+    placeholder-color: @@text_dim@@;
+    vertical-align:   0.5;
+    cursor:           text;
+}
+
+listview {
+    margin:           0 8px;
+    lines:            8;
+    columns:          1;
+    fixed-height:     false;
+    dynamic:          true;
+    scrollbar:        true;
+    background-color: @@field@@;
+    border:           1px;
+    border-color:     @@face_lo@@;
+    padding:          1px;
+}
+scrollbar {
+    width:            12px;
+    handle-width:     12px;
+    handle-color:     @@face_lo@@;
+    background-color: @@face_hi@@;
+}
+
+element {
+    padding:          4px 6px;
+    spacing:          8px;
+    text-color:       @@field_text@@;
+    cursor:           pointer;
+}
+element normal.active, element alternate.active {
+    text-color:       @@accent@@;
+}
+element selected.normal, element selected.active {
+    background-color: @@accent@@;
+    text-color:       @@accent_text@@;
+}
+element-icon {
+    size:             22px;
+    cursor:           inherit;
+}
+element-text {
+    text-color:       inherit;
+    vertical-align:   0.5;
+    markup:           true;
+    cursor:           inherit;
+}
+
+textbox-hint {
+    expand:           false;
+    content:          "Enter: open     Esc: close";
+    margin:           0 8px;
+    text-color:       @@text_dim@@;
+    font:             "@@font@@ 9";
+}

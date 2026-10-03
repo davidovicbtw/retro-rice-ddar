@@ -1,0 +1,9 @@
+#!/bin/bash
+# Test double: records its arguments; output mimics the real tool.
+echo "pactl $*" >> "$FAKE_CMDS"
+case "$1" in
+ get-sink-volume) echo "Volume: front-left: 26214 /  40% / -23.88 dB,   front-right: 26214 /  40% / -23.88 dB" ;;
+ get-sink-mute) echo "Mute: no" ;;
+ get-default-sink) echo alsa_output.pci.analog ;;
+ list) printf 'Sink #1\n\tState: RUNNING\n\tName: alsa_output.pci.analog\n\tDescription: Built-in Audio Analog Stereo\nSink #2\n\tName: bluez_output.AA\n\tDescription: WH-1000XM4\n' ;;
+esac

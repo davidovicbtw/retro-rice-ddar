@@ -1,0 +1,15 @@
+/* DDAR launcher - "compact": a small run box, no hint line. */
+@import "base.rasi"
+
+window {
+    width:            280px;
+}
+mainbox {
+    children:         [ textbox-title, inputbar, listview ];
+}
+listview {
+    lines:            8;
+}
+element-icon {
+    size:             14px;
+}

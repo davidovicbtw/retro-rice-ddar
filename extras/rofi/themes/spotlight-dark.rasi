@@ -1,0 +1,133 @@
+/* DDAR Spotlight launcher for Rofi (>= 1.7).
+ * Spotlight layout (one big search field in the upper third, results
+ * underneath) drawn in the DDAR retro style: square window, 1px bevels,
+ * gradient title bar, sunken search field and result list.
+ * Self-contained: colours are written in, nothing else is imported.
+ *   rofi -show drun -theme /path/to/this/file.rasi
+ * Source: templates/rofi/launcher-spotlight.rasi in the DDAR repository. */
+
+configuration {
+    show-icons:          true;
+    drun-display-format: "{name}[  <span size='small' alpha='70%'>{generic}</span>]";
+    display-drun:        "Find:";
+    display-run:         "Run:";
+    display-window:      "Window:";
+    hover-select:        true;
+    me-select-entry:     "";
+    me-accept-entry:     "MousePrimary";
+    sort:                true;
+    sorting-method:      "fzf";
+}
+
+* {
+    font:             "Noto Sans 10";
+    background-color: transparent;
+    text-color:       #e7e1cf;
+    spacing:          0;
+}
+
+/* outer frame: dark 1px outline */
+window {
+    location:         north;
+    anchor:           north;
+    y-offset:         18%;
+    width:            600px;
+    background-color: #33343aff;
+    border:           1px;
+    border-color:     #0b0b0d;
+    border-radius:    0;
+    padding:          0;
+}
+
+/* inner highlight edge = the raised bevel */
+mainbox {
+    border:           1px;
+    border-color:     #55575f;
+    padding:          0 0 4px 0;
+    spacing:          6px;
+    children:         [ textbox-title, inputbar, listview, textbox-hint ];
+}
+
+/* literal colours: rofi gradients reject @variables */
+textbox-title {
+    expand:           false;
+    content:          "DDAR  Find Program";
+    background-image: linear-gradient(to right, #d49a2a, #7b6132);
+    text-color:       #16161a;
+    padding:          3px 6px;
+    font:             "Noto Sans Bold 10";
+}
+
+/* search row: label + sunken field */
+inputbar {
+    margin:           2px 8px 0 8px;
+    spacing:          8px;
+    children:         [ prompt, entry ];
+}
+prompt {
+    vertical-align:   0.5;
+    font:             "Noto Sans Bold 10";
+}
+entry {
+    background-color: #1f2024;
+    text-color:       #e7e1cf;
+    border:           1px;
+    border-color:     #1b1c20;
+    padding:          5px 6px;
+    font:             "Noto Sans 15";
+    placeholder:      "type a program name...";
+    placeholder-color: #9d9787;
+    vertical-align:   0.5;
+    cursor:           text;
+}
+
+listview {
+    margin:           0 8px;
+    lines:            8;
+    columns:          1;
+    fixed-height:     false;
+    dynamic:          true;
+    scrollbar:        true;
+    background-color: #1f2024;
+    border:           1px;
+    border-color:     #1b1c20;
+    padding:          1px;
+}
+scrollbar {
+    width:            12px;
+    handle-width:     12px;
+    handle-color:     #1b1c20;
+    background-color: #55575f;
+}
+
+element {
+    padding:          4px 6px;
+    spacing:          8px;
+    text-color:       #e7e1cf;
+    cursor:           pointer;
+}
+element normal.active, element alternate.active {
+    text-color:       #d49a2a;
+}
+element selected.normal, element selected.active {
+    background-color: #d49a2a;
+    text-color:       #16161a;
+}
+element-icon {
+    size:             22px;
+    cursor:           inherit;
+}
+element-text {
+    text-color:       inherit;
+    vertical-align:   0.5;
+    markup:           true;
+    cursor:           inherit;
+}
+
+textbox-hint {
+    expand:           false;
+    content:          "Enter: open     Esc: close";
+    margin:           0 8px;
+    text-color:       #9d9787;
+    font:             "Noto Sans 9";
+}

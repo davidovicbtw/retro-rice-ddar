@@ -1,0 +1,2 @@
+/* DDAR launcher - "list": start-menu style, opens under the DDAR button. */
+@import "base.rasi"

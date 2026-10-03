@@ -1,0 +1,26 @@
+/* DDAR launcher - "grid": centred program manager with large icons. */
+@import "base.rasi"
+
+window {
+    location:         center;
+    anchor:           center;
+    x-offset:         0;
+    y-offset:         0;
+    width:            560px;
+}
+listview {
+    columns:          5;
+    lines:            4;
+    fixed-height:     true;
+}
+element {
+    orientation:      vertical;
+    padding:          6px 2px;
+    spacing:          3px;
+}
+element-icon {
+    size:             32px;
+}
+element-text {
+    horizontal-align: 0.5;
+}

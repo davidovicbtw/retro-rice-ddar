@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# ddar-weather - Waybar custom module (JSON). Off by default; enable the
+# "weather" widget in `ddar config`. Uses wttr.in, cached for 30 minutes so
+# the bar never waits on the network. --refresh forces a new fetch.
+set -uo pipefail
+
+DDAR_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export DDAR_ROOT
+# shellcheck source=../lib/common.sh
+source "$DDAR_ROOT/lib/common.sh"
+config_load
+
+cache="$DDAR_CACHE_DIR/weather.json"
+max_age=1800
+
+json() { jq -cn --arg t "$1" --arg tip "$2" --arg c "$3" '{text: $t, tooltip: $tip, class: $c}'; }
+
+if ! have curl || ! have jq; then json "WX n/a" "Weather needs curl and jq" "error"; exit 0; fi
+
+fetch() {
+    local loc raw
+    loc="$(cfg WEATHER_LOCATION)"; loc="${loc// /+}"
+    raw="$(curl -fsS --max-time 8 "https://wttr.in/${loc}?format=j1" 2>/dev/null)" || return 1
+    jq -e '.current_condition[0]' >/dev/null 2>&1 <<<"$raw" || return 1
+    mkdir -p "$DDAR_CACHE_DIR"
+    printf '%s' "$raw" >"$cache.tmp" && mv -f "$cache.tmp" "$cache"
+}
+
+age=$max_age
+[[ -s "$cache" ]] && age=$(( $(date +%s) - $(stat -c %Y "$cache") ))
+if [[ "${1:-}" == --refresh ]] || (( age >= max_age )); then
+    fetch || [[ -s "$cache" ]] || { json "WX --" "Weather unavailable (offline?)" "error"; exit 0; }
+fi
+[[ "${1:-}" == --refresh ]] && exit 0
+
+jq -c '
+  .current_condition[0] as $c
+  | (.nearest_area[0].areaName[0].value // "") as $area
+  | {
+      text: ("WX " + $c.temp_C + "°C"),
+      tooltip: ($area + ": " + $c.weatherDesc[0].value
+                + "\nFeels like " + $c.FeelsLikeC + "°C, humidity " + $c.humidity + "%"
+                + "\nWind " + $c.windspeedKmph + " km/h"),
+      class: "weather"
+    }' "$cache" 2>/dev/null || json "WX --" "Could not read weather data" "error"

@@ -1,0 +1,6 @@
+#!/bin/bash
+# Test double for DankMaterialShell's CLI: `dms ipc call wallpaper get`
+# prints $FAKE_DMS_WALLPAPER (unset = the IPC fails, like a stopped shell).
+echo "dms $*" >> "${FAKE_CMDS:-/dev/null}"
+[[ "$*" == "ipc call wallpaper get" && -n "${FAKE_DMS_WALLPAPER:-}" ]] || exit 1
+echo "$FAKE_DMS_WALLPAPER"
