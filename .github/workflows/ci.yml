@@ -16,3 +16,5 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck jq
       - name: Smoke tests (sandboxed HOME, includes shellcheck)
         run: tests/smoke.sh
+      - name: Popup scenarios (fake rofi/nmcli/pactl/playerctl)
+        run: tests/popups.sh

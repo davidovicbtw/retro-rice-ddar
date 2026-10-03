@@ -2,6 +2,10 @@
 # DDAR shared library: paths, logging, config parsing and template rendering.
 # Sourced by bin/ddar, install.sh, uninstall.sh and the helper scripts.
 
+# bash >= 5.2: '&' in ${var//pattern/replacement} would mean "the match".
+# DDAR's escaping (e.g. '<' -> '&lt;') needs it literal everywhere.
+shopt -u patsub_replacement 2>/dev/null || true
+
 # ---------------------------------------------------------------- paths ----
 # DDAR_ROOT must be set by the caller (the repository / install directory).
 : "${DDAR_ROOT:?DDAR_ROOT must be set before sourcing common.sh}"
@@ -214,7 +218,6 @@ declare -gA PAL=()
 render_template() {
     local src="$1" dest="$2" content key
     content="$(<"$src")"
-    shopt -u patsub_replacement 2>/dev/null || true   # bash>=5.2: '&' must stay literal
     for key in "${!PAL[@]}"; do
         content="${content//@@${key}@@/${PAL[$key]}}"
     done

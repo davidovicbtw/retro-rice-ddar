@@ -50,6 +50,9 @@ confirm_menu() { # confirm_menu QUESTION -> success if "Yes"
 kv() { printf '<b>%-9s</b> %s\n' "$1" "$(esc "$2")"; }
 
 # ------------------------------------------------------------- network --
+# nmcli's terse output escapes ':' and '\' with a backslash.
+nm_unescape() { local s="${1//\\:/:}"; printf '%s' "${s//\\\\/\\}"; }
+
 _nm_result() { # run an nmcli command and report the outcome
     if "$@" >/dev/null 2>&1; then notify "Connected to $i"; else notify "Could not connect to $i"; fi
 }
@@ -61,8 +64,14 @@ popup_network() {
     fi
     while true; do
         radio="$(nmcli radio wifi 2>/dev/null)"
-        read -r dev state conn < <(nmcli -t -f DEVICE,STATE,CONNECTION device 2>/dev/null |
-            awk -F: '$2 == "connected" { print $1, $2, $3; exit }')
+        # Device names never contain ':'; connection names may, so they are
+        # read separately and unescaped.
+        dev="$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: '$2 == "connected" { print $1; exit }')"
+        state=""; conn=""
+        if [[ -n "$dev" ]]; then
+            state=connected
+            conn="$(nm_unescape "$(nmcli -g GENERAL.CONNECTION device show "$dev" 2>/dev/null | head -n1)")"
+        fi
         mesg="$(kv Status "${state:-disconnected}")"
         [[ -n "${conn:-}" ]] && mesg+=$'\n'"$(kv Network "$conn")"$'\n'"$(kv Device "$dev")"
         [[ -n "${dev:-}" ]] && mesg+=$'\n'"$(kv Address "$(nmcli -g IP4.ADDRESS device show "$dev" 2>/dev/null | head -n1)")"
@@ -72,7 +81,7 @@ popup_network() {
         if [[ "$radio" == enabled ]]; then
             while IFS= read -r line; do
                 IFS=: read -r inuse signal sec ssid <<<"$line"
-                ssid="${ssid//\\:/:}"; ssid="${ssid//\\\\/\\}"
+                ssid="$(nm_unescape "$ssid")"
                 [[ -n "$ssid" ]] || continue
                 rows+=("$(printf '%s %-20.20s %3s%%  %s' "$([[ "$inuse" == '*' ]] && echo '●' || echo ' ')" "$ssid" "$signal" "${sec:-open}")")
                 ssid_list+=("$ssid")
@@ -98,7 +107,7 @@ popup_network() {
                         else notify "Install nm-connection-editor or use nmtui"; fi
                         return ;;
                     *)
-                        known="$(nmcli -g NAME connection show 2>/dev/null | grep -Fx -- "$i")"
+                        known="$(nmcli -g NAME connection show 2>/dev/null | while IFS= read -r c; do nm_unescape "$c"; echo; done | grep -Fx -- "$i")"
                         if [[ -n "$known" ]]; then
                             _nm_result nmcli connection up id "$i"
                         else
@@ -138,7 +147,7 @@ _mute()     { if have pactl; then pactl set-sink-mute @DEFAULT_SINK@ toggle; els
 _mic_mute() { if have pactl; then pactl set-source-mute @DEFAULT_SOURCE@ toggle; else wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle; fi; }
 
 popup_audio() {
-    local rows r bar n def mesg
+    local rows r bar fill n def mesg
     local -a sinks=() descs=()
     if ! have pactl && ! have wpctl; then
         menu "Audio" "Neither pactl (libpulse) nor wpctl (wireplumber) is installed." "Close" >/dev/null; return
@@ -146,7 +155,9 @@ popup_audio() {
     while true; do
         _vol_get
         n=$(( ${VOL:-0} / 10 )); ((n > 10)) && n=10
-        printf -v bar '%*s' "$n" ""; bar="${bar// /█}"; printf -v bar '%-10s' "$bar"; bar="${bar// /░}"
+        # Built from two runs of spaces: printf pads by bytes, and █ is 3 bytes.
+        printf -v bar '%*s' "$n" ""; bar="${bar// /█}"
+        printf -v fill '%*s' "$((10 - n))" ""; bar+="${fill// /░}"
         mesg="$(kv Volume "${VOL:-?}%$([[ $MUTED == 1 ]] && echo ' (muted)')")"$'\n'"<tt>[$bar]</tt>"
         sinks=(); descs=()
         if have pactl; then

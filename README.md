@@ -321,7 +321,7 @@ DDAR only ever fast-forwards. If your checkout has local edits or commits, it st
 ├── defaults/                   initial ddar.conf and shortcuts.conf
 ├── assets/wallpapers/          bundled wallpapers
 ├── docs/                       theme guide, screenshots
-└── tests/smoke.sh              sandboxed test suite
+└── tests/                      smoke.sh, popups.sh (+ fakes/), sandboxed
 ```
 
 ## Contributing
@@ -330,7 +330,7 @@ Issues and pull requests are welcome. Please:
 
 - keep it lightweight: no new daemons, no polling loops, no heavy dependencies;
 - keep to the visual language: thin bevels, compact spacing, no blur, no rounded cards;
-- run `tests/smoke.sh` (it uses a throw-away `$HOME`) and `shellcheck -x bin/ddar scripts/* lib/*.sh install.sh uninstall.sh`;
+- run `tests/smoke.sh` and `tests/popups.sh` (both use a throw-away `$HOME`; the second drives the popups with fake `rofi`/`nmcli`/`pactl`/`playerctl`) and `shellcheck -x bin/ddar scripts/* lib/*.sh install.sh uninstall.sh`;
 - test on a real Hyprland session, and say in the PR which Hyprland/Waybar/Rofi versions you used.
 
 New themes are especially welcome: one `themes/<name>/theme.conf` file, plus a screenshot.

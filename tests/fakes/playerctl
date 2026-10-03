@@ -1,0 +1,9 @@
+#!/bin/bash
+# Test double: records its arguments; output mimics the real tool.
+echo "playerctl $*" >> "$FAKE_CMDS"
+case "$*" in
+ "-l") printf 'spotify\nfirefox.instance123\n' ;;
+ *status) echo Playing ;;
+ *"metadata --format"*) echo "Daft Punk - Something <About> Us & More" ;;
+ *"metadata album") echo "Discovery" ;;
+esac

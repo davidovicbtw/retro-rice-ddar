@@ -1,0 +1,4 @@
+#!/bin/bash
+# Test double: records its arguments; output mimics the real tool.
+echo "powerprofilesctl $*" >> "$FAKE_CMDS"
+case "$1" in get) echo balanced ;; list) printf '  performance:\n    Driver: amd\n\n* balanced:\n    Driver: amd\n\n  power-saver:\n    Driver: amd\n' ;; esac
